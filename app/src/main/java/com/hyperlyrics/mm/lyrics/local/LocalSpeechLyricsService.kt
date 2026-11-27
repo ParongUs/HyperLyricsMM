@@ -371,8 +371,8 @@ class LocalSpeechLyricsService : Service() {
         private const val NOTIFICATION_ID = 4109
         private const val SAMPLE_RATE = 16_000
 
-        const val ACTION_START = "com.hyperlyrics.mm.action.START_LOCAL_SPEECH"
-        const val ACTION_STOP = "com.hyperlyrics.mm.action.STOP_LOCAL_SPEECH"
+        const val ACTION_START = "io.github.parongus.hyperlyricsmm.action.START_LOCAL_SPEECH"
+        const val ACTION_STOP = "io.github.parongus.hyperlyricsmm.action.STOP_LOCAL_SPEECH"
         const val EXTRA_TITLE = "extra_title"
         const val EXTRA_ARTIST = "extra_artist"
         const val EXTRA_VIDEO_ID = "extra_video_id"

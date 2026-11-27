@@ -92,18 +92,18 @@ data class ModuleSettings(
 
 object ModuleConfig {
     const val PREFS_NAME = "hyperlyrics_mm_prefs"
-    const val MODULE_PACKAGE = "com.hyperlyrics.mm"
+    const val MODULE_PACKAGE = "io.github.parongus.hyperlyricsmm"
     const val FEEDBACK_EMAIL = "mehmeteymensevik@gmail.com"
     const val GITHUB_REPO_URL = "https://github.com/ParongUs/HyperLyricsMM"
     const val GITHUB_ISSUES_URL = "https://github.com/ParongUs/HyperLyricsMM/issues"
-    const val BRIDGE_AUTHORITY = "com.hyperlyrics.mm.lyrics.bridge"
+    const val BRIDGE_AUTHORITY = "io.github.parongus.hyperlyricsmm.lyrics.bridge"
     const val SYSTEM_UI_PACKAGE = "com.android.systemui"
     const val SYSTEM_UI_PLUGIN_PACKAGE = "miui.systemui.plugin"
     const val YT_MUSIC_PACKAGE = "com.google.android.apps.youtube.music"
 
-    const val ACTION_LYRICS_UPDATED = "com.hyperlyrics.mm.ACTION_LYRICS_UPDATED"
-    const val ACTION_SETTINGS_CHANGED = "com.hyperlyrics.mm.ACTION_SETTINGS_CHANGED"
-    const val ACTION_REQUEST_YTM_OFFLINE_SCAN = "com.hyperlyrics.mm.ACTION_REQUEST_YTM_OFFLINE_SCAN"
+    const val ACTION_LYRICS_UPDATED = "io.github.parongus.hyperlyricsmm.ACTION_LYRICS_UPDATED"
+    const val ACTION_SETTINGS_CHANGED = "io.github.parongus.hyperlyricsmm.ACTION_SETTINGS_CHANGED"
+    const val ACTION_REQUEST_YTM_OFFLINE_SCAN = "io.github.parongus.hyperlyricsmm.ACTION_REQUEST_YTM_OFFLINE_SCAN"
 
     // Preference Keys
     const val KEY_MASTER_ENABLED = "master_enabled"

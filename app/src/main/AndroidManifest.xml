@@ -49,7 +49,7 @@
         -->
         <provider
             android:name=".ipc.LyricsBridgeProvider"
-            android:authorities="com.hyperlyrics.mm.lyrics.bridge"
+            android:authorities="${applicationId}.lyrics.bridge"
             android:exported="true" />
 
         <!-- Optional On-Device Local Speech-to-Lyrics Extractor Service (Android 13+ Offline ASR) -->

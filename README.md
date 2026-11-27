@@ -40,7 +40,8 @@
 ## Requirements & Installation
 
 1. **Xiaomi HyperOS 2 / HyperOS 3** (Android 13+, `minSdk = 33`) with **LSPosed / Vector (LibXposed API 101+)**.
-2. Build or install the APK:
+2. **Package ID:** `io.github.parongus.hyperlyricsmm` (compatible with the official LSPosed & Vector Xposed Modules Repository).
+3. Install `HyperLyricsMM-v1.2.1.apk` from [GitHub Releases](https://github.com/ParongUs/HyperLyricsMM/releases/latest) or build from source:
    ```bash
    ./gradlew testDebugUnitTest assembleRelease
    ```
