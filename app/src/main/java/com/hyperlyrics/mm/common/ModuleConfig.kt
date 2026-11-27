@@ -51,6 +51,8 @@ data class ModuleSettings(
 
     // Expanded Hyper Island (Split compact player + flowing lyrics)
     val expandedLyricsEnabled: Boolean = true,
+    val pinExpandedIslandEnabled: Boolean = false,
+    val showPinButtonOnIsland: Boolean = true,
     val expandedThemeStyle: ExpandedThemeStyle = ExpandedThemeStyle.YTM_DYNAMIC,
     val accentColorMode: AccentColorMode = AccentColorMode.YTM_CRIMSON,
     val leftPaneRatioPercent: Int = 45, // 38..52 (left compact player width %)
@@ -91,6 +93,9 @@ data class ModuleSettings(
 object ModuleConfig {
     const val PREFS_NAME = "hyperlyrics_mm_prefs"
     const val MODULE_PACKAGE = "com.hyperlyrics.mm"
+    const val FEEDBACK_EMAIL = "mehmeteymensevik@gmail.com"
+    const val GITHUB_REPO_URL = "https://github.com/ParongUs/HyperLyricsMM"
+    const val GITHUB_ISSUES_URL = "https://github.com/ParongUs/HyperLyricsMM/issues"
     const val BRIDGE_AUTHORITY = "com.hyperlyrics.mm.lyrics.bridge"
     const val SYSTEM_UI_PACKAGE = "com.android.systemui"
     const val SYSTEM_UI_PLUGIN_PACKAGE = "miui.systemui.plugin"
@@ -104,6 +109,8 @@ object ModuleConfig {
     const val KEY_MASTER_ENABLED = "master_enabled"
     const val KEY_APP_LANGUAGE = "app_language"
     const val KEY_EXPANDED_LYRICS_ENABLED = "expanded_lyrics_enabled"
+    const val KEY_PIN_EXPANDED_ISLAND_ENABLED = "pin_expanded_island_enabled"
+    const val KEY_SHOW_PIN_BUTTON_ON_ISLAND = "show_pin_button_on_island"
     const val KEY_EXPANDED_THEME_STYLE = "expanded_theme_style"
     const val KEY_ACCENT_COLOR_MODE = "accent_color_mode"
     const val KEY_LEFT_PANE_RATIO_PERCENT = "left_pane_ratio_percent"
@@ -152,6 +159,8 @@ object ModuleConfig {
             masterEnabled = prefs.getBoolean(KEY_MASTER_ENABLED, true),
             appLanguage = AppLanguage.fromId(prefs.getInt(KEY_APP_LANGUAGE, AppLanguage.SYSTEM.id)),
             expandedLyricsEnabled = prefs.getBoolean(KEY_EXPANDED_LYRICS_ENABLED, true),
+            pinExpandedIslandEnabled = prefs.getBoolean(KEY_PIN_EXPANDED_ISLAND_ENABLED, false),
+            showPinButtonOnIsland = prefs.getBoolean(KEY_SHOW_PIN_BUTTON_ON_ISLAND, true),
             expandedThemeStyle = ExpandedThemeStyle.fromId(
                 prefs.getInt(KEY_EXPANDED_THEME_STYLE, ExpandedThemeStyle.YTM_DYNAMIC.id)
             ),
@@ -187,6 +196,8 @@ object ModuleConfig {
         editor.putBoolean(KEY_MASTER_ENABLED, settings.masterEnabled)
         editor.putInt(KEY_APP_LANGUAGE, settings.appLanguage.id)
         editor.putBoolean(KEY_EXPANDED_LYRICS_ENABLED, settings.expandedLyricsEnabled)
+        editor.putBoolean(KEY_PIN_EXPANDED_ISLAND_ENABLED, settings.pinExpandedIslandEnabled)
+        editor.putBoolean(KEY_SHOW_PIN_BUTTON_ON_ISLAND, settings.showPinButtonOnIsland)
         editor.putInt(KEY_EXPANDED_THEME_STYLE, settings.expandedThemeStyle.id)
         editor.putInt(KEY_ACCENT_COLOR_MODE, settings.accentColorMode.id)
         editor.putInt(KEY_LEFT_PANE_RATIO_PERCENT, settings.leftPaneRatioPercent)

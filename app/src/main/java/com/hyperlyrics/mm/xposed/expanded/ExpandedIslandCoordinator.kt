@@ -126,6 +126,18 @@ object ExpandedIslandCoordinator {
             }
         }
 
+        // Install collapse guards on HyperOS's media island controller for Pin/Float mode
+        ExpandedIslandPinController.hookCollapseGuardsForClasses(
+            module = module,
+            classLoader = classLoader,
+            classNames = listOf(
+                CONTROLLER_CLASS,
+                BINDER_CLASS,
+                "com.android.systemui.statusbar.notification.island.IslandWindowController",
+                "com.android.systemui.statusbar.notification.island.DynamicIslandController"
+            )
+        )
+
         ensureRuntimeListeners()
         ModuleLogger.i(TAG, "Expanded Hyper Island hooks installed ($hookedCount methods)")
     }
@@ -136,6 +148,10 @@ object ExpandedIslandCoordinator {
 
         RuntimeSettingsHolder.addListener {
             refreshAllActiveBinders()
+        }
+
+        ExpandedIslandPinController.addPinStateListener { pinned ->
+            refreshPinStateOnActiveBinders(pinned)
         }
 
         YouTubeMusicSessionTracker.addListener(object : YouTubeMusicSessionTracker.Listener {
@@ -161,6 +177,9 @@ object ExpandedIslandCoordinator {
             if (action == Action.DETACH) {
                 activeBinders.remove(binder)
                 binderPalettes.remove(binder)
+                if (activeBinders.isEmpty()) {
+                    ExpandedIslandPinController.clearSession()
+                }
                 return chain.proceed()
             }
 
@@ -185,6 +204,29 @@ object ExpandedIslandCoordinator {
         val snapshot = synchronized(activeBinders) { activeBinders.toList() }
         snapshot.forEach { binder ->
             runCatching { applyOrRestoreBinder(binder, explicitMediaData = null, refreshPalette = true) }
+        }
+    }
+
+    private fun refreshPinStateOnActiveBinders(isPinned: Boolean) {
+        val api = nativeApi ?: return
+        val settings = RuntimeSettingsHolder.current
+        val snapshot = synchronized(activeBinders) { activeBinders.toList() }
+
+        snapshot.forEach { binder ->
+            runCatching {
+                val pkg = api.getPackageName(binder, null)
+                if (!ModuleConfig.isYouTubeMusicPackage(pkg)) return@forEach
+                val palette = binderPalettes[binder] ?: YtmCardPalette.DEFAULT_DYNAMIC
+                api.getHolders(binder).forEach { holder ->
+                    val player = api.getPlayer(holder) ?: return@forEach
+                    ExpandedYtmSplitLayout.updatePinStateOnly(
+                        player = player,
+                        isPinned = isPinned,
+                        settings = settings,
+                        palette = palette
+                    )
+                }
+            }
         }
     }
 
@@ -231,6 +273,11 @@ object ExpandedIslandCoordinator {
         if (!shouldActivate) {
             holders.forEach { holder ->
                 api.extractHolderViews(holder)?.let { views ->
+                    ExpandedIslandPinController.reconcilePlayer(
+                        player = views.player,
+                        isYtmActive = false,
+                        settings = settings
+                    )
                     ExpandedYtmSplitLayout.restoreNativeLayout(views) { seekBar ->
                         restoreSeekBarOffset(api, seekBar)
                     }
@@ -260,6 +307,7 @@ object ExpandedIslandCoordinator {
         }
 
         val lyricsState = YouTubeMusicSessionTracker.currentLyricsState
+        val pinnedNow = ExpandedIslandPinController.isPinned(settings)
 
         holders.forEach { holder ->
             api.extractHolderViews(holder)?.let { views ->
@@ -272,12 +320,21 @@ object ExpandedIslandCoordinator {
                     positionProvider = { YouTubeMusicSessionTracker.currentPositionMs() },
                     onSeekRequested = { targetMs -> YouTubeMusicSessionTracker.seekTo(targetMs) },
                     onRetryRequested = { YouTubeMusicSessionTracker.forceRetryCurrentTrack() },
+                    isPinned = pinnedNow,
+                    onPinToggleRequested = {
+                        ExpandedIslandPinController.toggleManualPin(RuntimeSettingsHolder.current)
+                    },
                     applySeekBarColors = { seekBar, active, track ->
                         api.setSeekBarColors(seekBar, active, track)
                     },
                     resetSeekBarOffsets = { seekBar ->
                         zeroSeekBarOffset(api, seekBar)
                     }
+                )
+                ExpandedIslandPinController.reconcilePlayer(
+                    player = views.player,
+                    isYtmActive = true,
+                    settings = settings
                 )
             }
         }

@@ -10,6 +10,7 @@
   - Built directly over HyperOS's native `PlayerIslandConstraintLayout` / `MiuiIslandMediaViewBinderImpl` (syncing both real and transition dummy holders).
   - **Left Pane (~45%, adjustable 38%–52%):** 10dp rounded album art, marquee title & artist, output switcher badge, fully scrubbable `HyperProgressSeekBar` + timestamps, and comfortably sized `Prev / Play-Pause / Next / Like` buttons.
   - **Right Pane (~55%):** Custom hardware-accelerated `FlowingLyricsView` with 60–120fps critically-damped spring scrolling, smooth top/bottom gradient edge fades, rhythmic interlude dots (`• • •`), swipe-to-browse, and **Tap-to-Seek**.
+  - **Expanded Island Pin / Non-Blocking Float Mode:** Optional auto-pin setting and 1-tap Pin toggle badge on the top-right corner of the expanded card that keeps the expanded island open and lyrics flowing while you interact with apps and type underneath (touches outside the card pass straight through with zero screen dimming).
   - **YouTube Music Theme:** Album-extracted velvet-dark dynamic gradients, Pure Dark (`#030303`), or HyperOS Native Glass, with `#FF0033` Crimson / White / Album-adaptive accents. Automatically restores stock HyperOS layout for non-YouTube Music apps.
 - **Minimal (Collapsed) Island — Optional Single-Line Lyrics**
   - Toggleable on/off in settings. Displays smaller (`9–13.5sp`), crisp single-line synced lyrics beside the camera punch-hole with smooth slide transitions and horizontal marquee.
@@ -20,18 +21,19 @@
   - **External Providers (Opt-In):** LRCLIB (synced LRC), YouTube Timed Captions (CC / auto-transcript), and NetEase Cloud Music.
   - **Local `.lrc` / `.ttml` / `.txt` Folder & Importer:** Pick any device folder via Android SAF or paste/import lyrics directly to pin offline.
   - **On-Device Local Speech-to-Lyrics Extractor (Android 13+ Offline AI):** Opt-in local speech recognizer (`SpeechRecognizer.createOnDeviceSpeechRecognizer` + `AudioPlaybackCapture`) that transcribes internal playback audio locally and saves synced lyrics to the offline cache.
-- **Bilingual Companion App (English & Turkish)**
-  - In-app language selector (`System / English / Türkçe`), live interactive Expanded + Minimal Island preview, and built-in Live Fetch Tester.
+- **Tabbed Bilingual Companion App (English & Turkish)**
+  - Clean 4-tab navigation (`Home / Island / Sources / Support`) with in-app language selector (`System / English / Türkçe`), live interactive Expanded + Minimal Island preview, built-in Live Fetch Tester, log viewer, and direct email/GitHub feedback (`mehmeteymensevik@gmail.com`).
 
 ---
 
 ## Özellikler (Türkçe)
 
 - **Genişletilmiş Hyper Ada:** HyperOS'un orijinal YouTube Music oynatıcısı üzerinde solda kompakt ve hâlâ rahat kullanılabilir albüm kapağı, kaydırılabilir ilerleme çubuğu ve butonlar; sağda doğrudan YouTube Music'ten akan, dokunarak sarılabilen (Tap-to-Seek) zamanlı şarkı sözleri.
+- **Genişletilmiş Adayı Ekrana Kilitleme (Sabitleme):** Ayarlardan veya ada sağ üstündeki hızlı kilitleme butonundan aktif edilerek ekranda başka uygulamalarda çalışırken adanın açık kalmasını ve sözlerin akmaya devam etmesini sağlar; dış dokunuşlar ve klavye arkadaki uygulamaya geçer.
 - **Minimal Ada (İsteğe Bağlı):** Ayarlardan açılıp kapatılabilen, daha küçük puntolu, tek satır kayan şarkı sözleri.
 - **İnternetsiz YouTube Music Premium Desteği:** Premium ile indirilen şarkıların sözlerini otomatik önbelleğe sabitler ve tamamen çevrimdışıyken YouTube Music'in yerel deposundan/ekranından okuyabilir.
 - **Sözü Olmayan Şarkılar İçin Opsiyonel Çözümler:** İsteğe bağlı olarak dış kaynaklardan (LRCLIB, YouTube Altyazıları, NetEase) söz bulma, yerel `.lrc`/`.ttml` klasörü & yapıştırma veya Android 13+ cihaz içi çevrimdışı ses-söz çıkarıcı.
-- **Türkçe & İngilizce Dil Desteği:** Uygulama içinden anlık dil değişimi (`Sistem / English / Türkçe`) ve canlı interaktif Hyper Ada önizlemesi.
+- **4 Sekmeli Türkçe & İngilizce Arayüz + Geri Bildirim:** Ana Sayfa, Ada, Kaynaklar ve Destek sekmeleri; canlı interaktif önizleme, log görüntüleyici ve doğrudan geri bildirim (`mehmeteymensevik@gmail.com`).
 
 ---
 

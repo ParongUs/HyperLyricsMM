@@ -135,6 +135,8 @@ object LyricsBridgeClient {
                     reply.getInt(ModuleConfig.KEY_APP_LANGUAGE, AppLanguage.SYSTEM.id)
                 ),
                 expandedLyricsEnabled = reply.getBoolean(ModuleConfig.KEY_EXPANDED_LYRICS_ENABLED, true),
+                pinExpandedIslandEnabled = reply.getBoolean(ModuleConfig.KEY_PIN_EXPANDED_ISLAND_ENABLED, false),
+                showPinButtonOnIsland = reply.getBoolean(ModuleConfig.KEY_SHOW_PIN_BUTTON_ON_ISLAND, true),
                 expandedThemeStyle = ExpandedThemeStyle.fromId(
                     reply.getInt(ModuleConfig.KEY_EXPANDED_THEME_STYLE, ExpandedThemeStyle.YTM_DYNAMIC.id)
                 ),

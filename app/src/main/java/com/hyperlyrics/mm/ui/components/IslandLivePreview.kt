@@ -34,6 +34,7 @@ import androidx.compose.material.icons.rounded.GraphicEq
 import androidx.compose.material.icons.rounded.MusicNote
 import androidx.compose.material.icons.rounded.Pause
 import androidx.compose.material.icons.rounded.PlayArrow
+import androidx.compose.material.icons.rounded.PushPin
 import androidx.compose.material.icons.rounded.SkipNext
 import androidx.compose.material.icons.rounded.SkipPrevious
 import androidx.compose.material.icons.rounded.Speaker
@@ -54,6 +55,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -112,6 +114,9 @@ fun HyperIslandLivePreviewSection(
     }
 
     var isPlaying by remember { mutableStateOf(true) }
+    var previewPinned by remember(settings.pinExpandedIslandEnabled) {
+        mutableStateOf(settings.pinExpandedIslandEnabled)
+    }
     var positionMs by remember(previewTrack) {
         val firstVocal = previewTrack.lines.firstOrNull { !it.isInterlude }?.startTimeMs ?: 0L
         mutableLongStateOf(firstVocal)
@@ -191,11 +196,46 @@ fun HyperIslandLivePreviewSection(
             positionMs = positionMs,
             durationMs = maxDuration,
             isPlaying = isPlaying,
+            isPinned = previewPinned,
             accentColor = accentColor,
             onTogglePlay = { isPlaying = !isPlaying },
+            onTogglePin = { previewPinned = !previewPinned },
             onSeek = { target -> positionMs = target.coerceIn(0L, maxDuration) },
             strings = strings
         )
+
+        if (settings.masterEnabled && settings.expandedLyricsEnabled && (settings.showPinButtonOnIsland || previewPinned)) {
+            Spacer(modifier = Modifier.height(8.dp))
+            Row(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(999.dp))
+                    .background(if (previewPinned) accentColor.copy(alpha = 0.16f) else Color(0xFF15151B))
+                    .border(
+                        1.dp,
+                        if (previewPinned) accentColor.copy(alpha = 0.45f) else YtmColors.Hairline,
+                        RoundedCornerShape(999.dp)
+                    )
+                    .clickable { previewPinned = !previewPinned }
+                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.PushPin,
+                    contentDescription = null,
+                    tint = if (previewPinned) accentColor else YtmColors.TextMuted,
+                    modifier = Modifier
+                        .size(12.dp)
+                        .rotate(if (previewPinned) 0f else 40f)
+                )
+                Text(
+                    text = if (previewPinned) strings.pinBadgeActive else strings.pinBadgeTapHint,
+                    color = if (previewPinned) Color.White else YtmColors.TextSecondary,
+                    fontSize = 10.5.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
     }
 }
 
@@ -301,8 +341,10 @@ private fun ExpandedIslandCardPreview(
     positionMs: Long,
     durationMs: Long,
     isPlaying: Boolean,
+    isPinned: Boolean,
     accentColor: Color,
     onTogglePlay: () -> Unit,
+    onTogglePin: () -> Unit,
     onSeek: (Long) -> Unit,
     strings: AppStrings
 ) {
@@ -553,6 +595,32 @@ private fun ExpandedIslandCardPreview(
                         }
                     }
                 }
+            }
+        }
+
+        if (splitEnabled && (settings.showPinButtonOnIsland || isPinned)) {
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .size(24.dp)
+                    .clip(CircleShape)
+                    .background(if (isPinned) accentColor.copy(alpha = 0.88f) else Color(0x2EFFFFFF))
+                    .border(
+                        1.dp,
+                        if (isPinned) Color(0x88FFFFFF) else Color(0x38FFFFFF),
+                        CircleShape
+                    )
+                    .clickable { onTogglePin() },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.PushPin,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(13.dp)
+                        .rotate(if (isPinned) 0f else 40f)
+                )
             }
         }
     }

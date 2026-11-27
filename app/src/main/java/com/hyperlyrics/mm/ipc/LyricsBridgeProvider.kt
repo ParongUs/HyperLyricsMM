@@ -233,6 +233,8 @@ class LyricsBridgeProvider : ContentProvider() {
             putBoolean(ModuleConfig.KEY_MASTER_ENABLED, s.masterEnabled)
             putInt(ModuleConfig.KEY_APP_LANGUAGE, s.appLanguage.id)
             putBoolean(ModuleConfig.KEY_EXPANDED_LYRICS_ENABLED, s.expandedLyricsEnabled)
+            putBoolean(ModuleConfig.KEY_PIN_EXPANDED_ISLAND_ENABLED, s.pinExpandedIslandEnabled)
+            putBoolean(ModuleConfig.KEY_SHOW_PIN_BUTTON_ON_ISLAND, s.showPinButtonOnIsland)
             putInt(ModuleConfig.KEY_EXPANDED_THEME_STYLE, s.expandedThemeStyle.id)
             putInt(ModuleConfig.KEY_ACCENT_COLOR_MODE, s.accentColorMode.id)
             putInt(ModuleConfig.KEY_LEFT_PANE_RATIO_PERCENT, s.leftPaneRatioPercent)

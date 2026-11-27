@@ -17,6 +17,12 @@ data class AppStrings(
     val lyricsUnavailable: String,
     val noLyrics: String,
 
+    // Navigation Tabs
+    val tabHome: String,
+    val tabIsland: String,
+    val tabSources: String,
+    val tabFeedback: String,
+
     // General & Language
     val masterTitle: String,
     val masterSubtitle: String,
@@ -24,11 +30,19 @@ data class AppStrings(
     val langSystem: String,
     val langEnglish: String,
     val langTurkish: String,
+    val quickStatusPinnedOn: String,
+    val quickStatusPinnedOff: String,
 
     // Expanded Island
     val sectionExpanded: String,
     val expandedSplitTitle: String,
     val expandedSplitSubtitle: String,
+    val pinExpandedTitle: String,
+    val pinExpandedSubtitle: String,
+    val pinExpandedButtonTitle: String,
+    val pinExpandedButtonSubtitle: String,
+    val pinBadgeActive: String,
+    val pinBadgeTapHint: String,
     val themeTitle: String,
     val themeYtmDynamic: String,
     val themeYtmDark: String,
@@ -114,7 +128,36 @@ data class AppStrings(
 
     // Setup Guide
     val setupTitle: String,
-    val setupBody: String
+    val setupBody: String,
+
+    // Feedback, Diagnostics & About
+    val sectionPreferences: String,
+    val sectionFeedback: String,
+    val feedbackTitle: String,
+    val feedbackSubtitle: String,
+    val feedbackTypeLabel: String,
+    val feedbackTypeBug: String,
+    val feedbackTypeFeature: String,
+    val feedbackTypeGeneral: String,
+    val feedbackMessageHint: String,
+    val feedbackIncludeDiagTitle: String,
+    val feedbackIncludeDiagSubtitle: String,
+    val feedbackSendEmailBtn: String,
+    val feedbackCopyEmailBtn: String,
+    val feedbackEmailCopied: String,
+    val feedbackNoEmailApp: String,
+    val feedbackGithubIssuesBtn: String,
+    val sectionDiagnostics: String,
+    val viewLogsBtn: String,
+    val copyDiagBtn: String,
+    val diagCopiedMsg: String,
+    val logsDialogTitle: String,
+    val logsEmptyMsg: String,
+    val clearLogsBtn: String,
+    val closeBtn: String,
+    val sectionAbout: String,
+    val aboutDeveloperLabel: String,
+    val aboutGithubBtn: String
 )
 
 object AppStringsProvider {
@@ -138,16 +181,29 @@ object AppStringsProvider {
         lyricsUnavailable = "Lyrics unavailable",
         noLyrics = "No lyrics",
 
+        tabHome = "Home",
+        tabIsland = "Island",
+        tabSources = "Sources",
+        tabFeedback = "Support",
+
         masterTitle = "Enable HyperLyricsMM",
         masterSubtitle = "Enhances Hyper Island exclusively while YouTube Music is active",
         languageTitle = "App Language",
         langSystem = "System",
         langEnglish = "English",
         langTurkish = "Türkçe",
+        quickStatusPinnedOn = "Expanded Pin: Auto",
+        quickStatusPinnedOff = "Expanded Pin: Manual",
 
         sectionExpanded = "EXPANDED ISLAND (SPLIT PLAYER)",
         expandedSplitTitle = "Side-by-Side Flowing Lyrics",
         expandedSplitSubtitle = "Compact usable player on the left, live scrolling YouTube Music lyrics on the right",
+        pinExpandedTitle = "Keep Expanded Island Pinned",
+        pinExpandedSubtitle = "Keep expanded lyrics flowing at the top while you use other apps; outside touches & keyboard pass through",
+        pinExpandedButtonTitle = "Quick Pin Button on Island",
+        pinExpandedButtonSubtitle = "Show a 1-tap pin toggle at the top-right corner of the expanded card to lock/unlock anytime",
+        pinBadgeActive = "Pinned • Working below",
+        pinBadgeTapHint = "Tap pin to keep open",
         themeTitle = "Player Theme",
         themeYtmDynamic = "YTM Dynamic",
         themeYtmDark = "YTM Dark",
@@ -232,7 +288,35 @@ object AppStringsProvider {
         setupTitle = "LSPosed Setup Guide",
         setupBody = "1. Enable HyperLyricsMM in LSPosed Manager (LibXposed API 101+).\n" +
             "2. Check 'System UI' (com.android.systemui) and 'YouTube Music' in scope.\n" +
-            "3. Restart SystemUI or reboot. Setting updates apply live."
+            "3. Restart SystemUI or reboot. Setting updates apply live.",
+
+        sectionPreferences = "PREFERENCES",
+        sectionFeedback = "FEEDBACK & CONTACT",
+        feedbackTitle = "Send Feedback via Email",
+        feedbackSubtitle = "Report a HyperOS issue, request a feature, or share suggestions directly with the developer",
+        feedbackTypeLabel = "Topic",
+        feedbackTypeBug = "Bug Report",
+        feedbackTypeFeature = "Feature Idea",
+        feedbackTypeGeneral = "General",
+        feedbackMessageHint = "Describe your feedback, issue, or HyperOS model details...",
+        feedbackIncludeDiagTitle = "Attach Device & Module Info",
+        feedbackIncludeDiagSubtitle = "Adds app version, Android/HyperOS build, LSPosed status & recent logs",
+        feedbackSendEmailBtn = "Send Email",
+        feedbackCopyEmailBtn = "Copy Email",
+        feedbackEmailCopied = "Email copied: mehmeteymensevik@gmail.com",
+        feedbackNoEmailApp = "No email app found — email & feedback text copied to clipboard",
+        feedbackGithubIssuesBtn = "GitHub Issues",
+        sectionDiagnostics = "DIAGNOSTICS & LOGS",
+        viewLogsBtn = "View Recent Logs",
+        copyDiagBtn = "Copy Diagnostics",
+        diagCopiedMsg = "Diagnostic info copied to clipboard",
+        logsDialogTitle = "Recent Module Logs",
+        logsEmptyMsg = "No logs recorded in this session yet.",
+        clearLogsBtn = "Clear",
+        closeBtn = "Close",
+        sectionAbout = "ABOUT",
+        aboutDeveloperLabel = "Contact: mehmeteymensevik@gmail.com",
+        aboutGithubBtn = "GitHub Repo"
     )
 
     val TURKISH = AppStrings(
@@ -246,16 +330,29 @@ object AppStringsProvider {
         lyricsUnavailable = "Şarkı sözü bulunamadı",
         noLyrics = "Şarkı sözü yok",
 
+        tabHome = "Ana Sayfa",
+        tabIsland = "Ada",
+        tabSources = "Kaynaklar",
+        tabFeedback = "Destek",
+
         masterTitle = "HyperLyricsMM Modülü Aktif",
         masterSubtitle = "Yalnızca YouTube Music oynatılırken Hyper Ada düzenini geliştirir",
         languageTitle = "Uygulama Dili / Language",
         langSystem = "Sistem",
         langEnglish = "English",
         langTurkish = "Türkçe",
+        quickStatusPinnedOn = "Ada Kilitleme: Oto",
+        quickStatusPinnedOff = "Ada Kilitleme: Manuel",
 
         sectionExpanded = "GENİŞLETİLMİŞ ADA (SPLIT OYNATICI)",
         expandedSplitTitle = "Yan Yana Şarkı Sözleri",
         expandedSplitSubtitle = "Sol tarafta kompakt kontroller & ilerleme çubuğu, sağda akan YouTube Music sözleri",
+        pinExpandedTitle = "Genişletilmiş Adayı Ekrana Kilitle",
+        pinExpandedSubtitle = "Ekranda başka uygulamalarda çalışırken ada açık kalıp sözler akmaya devam eder; dış dokunuşlar ve klavye alta geçer",
+        pinExpandedButtonTitle = "Adada Hızlı Kilitleme Butonu",
+        pinExpandedButtonSubtitle = "Genişletilmiş kartın sağ üstüne tek dokunuşla kilitle/çöz butonu ekler",
+        pinBadgeActive = "Kilitli • Altta çalışılabilir",
+        pinBadgeTapHint = "Sabitlemek için dokun",
         themeTitle = "Kart Teması",
         themeYtmDynamic = "YTM Dinamik",
         themeYtmDark = "YTM Koyu",
@@ -340,6 +437,34 @@ object AppStringsProvider {
         setupTitle = "LSPosed Kurulum Adımları",
         setupBody = "1. LSPosed Manager'da HyperLyricsMM modülünü etkinleştirin (API 101+).\n" +
             "2. Kapsam (Scope) olarak 'Sistem Arayüzü' (com.android.systemui) ve 'YouTube Music' seçin.\n" +
-            "3. Sistem Arayüzünü veya cihazı yeniden başlatın. Ayarlar anlık uygulanır."
+            "3. Sistem Arayüzünü veya cihazı yeniden başlatın. Ayarlar anlık uygulanır.",
+
+        sectionPreferences = "TERCİHLER",
+        sectionFeedback = "GERİ BİLDİRİM & İLETİŞİM",
+        feedbackTitle = "E-posta ile Geri Bildirim Gönder",
+        feedbackSubtitle = "HyperOS uyumluluk hatası, özellik önerisi veya görüşlerinizi doğrudan geliştiriciye iletin",
+        feedbackTypeLabel = "Konu",
+        feedbackTypeBug = "Hata Bildir",
+        feedbackTypeFeature = "Özellik Öner",
+        feedbackTypeGeneral = "Genel",
+        feedbackMessageHint = "Yaşadığınız sorunu, önerinizi veya cihaz/HyperOS bilginizi yazın...",
+        feedbackIncludeDiagTitle = "Cihaz & Modül Bilgilerini Ekle",
+        feedbackIncludeDiagSubtitle = "Uygulama sürümü, Android/HyperOS derlemesi, LSPosed durumu ve son logları ekler",
+        feedbackSendEmailBtn = "E-posta Gönder",
+        feedbackCopyEmailBtn = "Maili Kopyala",
+        feedbackEmailCopied = "E-posta kopyalandı: mehmeteymensevik@gmail.com",
+        feedbackNoEmailApp = "E-posta uygulaması bulunamadı — adres ve mesaj panoya kopyalandı",
+        feedbackGithubIssuesBtn = "GitHub Issues",
+        sectionDiagnostics = "TANILAMA & LOGLAR",
+        viewLogsBtn = "Son Logları Gör",
+        copyDiagBtn = "Tanılamayı Kopyala",
+        diagCopiedMsg = "Tanılama bilgileri panoya kopyalandı",
+        logsDialogTitle = "Son Modül Logları",
+        logsEmptyMsg = "Bu oturumda henüz kayıtlı log yok.",
+        clearLogsBtn = "Temizle",
+        closeBtn = "Kapat",
+        sectionAbout = "HAKKINDA",
+        aboutDeveloperLabel = "İletişim: mehmeteymensevik@gmail.com",
+        aboutGithubBtn = "GitHub Deposu"
     )
 }

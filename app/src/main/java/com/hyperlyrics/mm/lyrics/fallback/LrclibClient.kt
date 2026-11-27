@@ -181,6 +181,6 @@ class LrclibClient(
 
     companion object {
         private const val TAG = "LrclibClient"
-        private const val USER_AGENT = "HyperLyricsMM/1.1.0 (https://github.com/ParongUs/HyperLyricsMM)"
+        private const val USER_AGENT = "HyperLyricsMM/1.2.0 (https://github.com/ParongUs/HyperLyricsMM)"
     }
 }

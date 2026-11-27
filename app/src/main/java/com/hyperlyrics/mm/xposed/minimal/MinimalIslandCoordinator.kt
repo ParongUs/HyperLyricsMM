@@ -15,6 +15,7 @@ import com.hyperlyrics.mm.common.ModuleLogger
 import com.hyperlyrics.mm.common.ModuleSettings
 import com.hyperlyrics.mm.lyrics.model.LyricsState
 import com.hyperlyrics.mm.xposed.RuntimeSettingsHolder
+import com.hyperlyrics.mm.xposed.expanded.ExpandedIslandPinController
 import com.hyperlyrics.mm.xposed.session.YouTubeMusicSessionTracker
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
@@ -165,6 +166,20 @@ object MinimalIslandCoordinator {
         }.onFailure {
             ModuleLogger.d(TAG, "Optional getMaxWidth hook skipped: ${it.message}")
         }
+
+        // 4. Hook plugin-level outside-touch / auto-collapse guards for Expanded Island Pin mode
+        ExpandedIslandPinController.hookCollapseGuardsForClasses(
+            module = module,
+            classLoader = classLoader,
+            classNames = listOf(
+                CONTENT_VIEW_CLASS,
+                BASE_CONTENT_VIEW_CLASS,
+                "miui.systemui.dynamicisland.window.DynamicIslandWindow",
+                "miui.systemui.dynamicisland.window.DynamicIslandWindowController",
+                "miui.systemui.dynamicisland.window.DynamicIslandWindowManager",
+                "miui.systemui.dynamicisland.DynamicIslandManager"
+            )
+        )
 
         if (hookedCount > 0) {
             ensureRuntimeListeners()

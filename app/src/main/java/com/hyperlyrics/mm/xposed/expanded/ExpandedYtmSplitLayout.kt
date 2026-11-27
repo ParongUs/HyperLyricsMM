@@ -49,6 +49,7 @@ internal object ExpandedYtmSplitLayout {
     private const val TAG_BACKDROP = "hyperlyrics_mm_ytm_backdrop"
     private const val TAG_DIVIDER = "hyperlyrics_mm_ytm_divider"
     private const val TAG_LYRICS = "hyperlyrics_mm_ytm_lyrics"
+    private const val TAG_PIN_TOGGLE = "hyperlyrics_mm_ytm_pin_toggle"
 
     private val playerStates = Collections.synchronizedMap(WeakHashMap<ViewGroup, PlayerState>())
     private val constraintApis = Collections.synchronizedMap(WeakHashMap<ClassLoader, ConstraintApi>())
@@ -124,6 +125,8 @@ internal object ExpandedYtmSplitLayout {
         positionProvider: () -> Long,
         onSeekRequested: (Long) -> Unit,
         onRetryRequested: () -> Unit,
+        isPinned: Boolean,
+        onPinToggleRequested: () -> Unit,
         applySeekBarColors: (View, Int, Int) -> Unit,
         resetSeekBarOffsets: (View) -> Unit
     ) {
@@ -140,10 +143,11 @@ internal object ExpandedYtmSplitLayout {
         val leftPanePx = (cardWidthPx * settings.leftPaneFraction).roundToInt()
             .coerceIn(dp(player.context, 134f), cardWidthPx - dp(player.context, 140f))
 
-        // 1. Ensure backdrop, divider, and FlowingLyricsView exist in player
+        // 1. Ensure backdrop, divider, FlowingLyricsView, and quick Pin toggle exist in player
         val backdrop = ensureBackdropView(player, api, state)
         val divider = ensureDividerView(player, api, state)
         val lyricsView = ensureLyricsView(player, api, state)
+        val pinToggle = ensurePinToggleView(player, api, state)
 
         // 2. Apply YouTube Music theme backdrop vs HyperOS native glass
         val useYtmBackdrop = settings.expandedThemeStyle != ExpandedThemeStyle.HYPEROS_NATIVE
@@ -239,6 +243,14 @@ internal object ExpandedYtmSplitLayout {
         lyricsView.updateLyricsState(lyricsState)
         lyricsView.updatePlaybackState(isPlaying)
 
+        // 8. Optional 1-tap Pin toggle badge in top-right corner (always shown while pinned so user can unpin)
+        val showPinToggle = settings.showPinButtonOnIsland || isPinned
+        updatePinToggleLayout(pinToggle, api, player.context)
+        pinToggle.visibility = if (showPinToggle) View.VISIBLE else View.GONE
+        pinToggle.onPinToggleRequested = onPinToggleRequested
+        pinToggle.updateState(isPinned = isPinned, accentColor = palette.accent)
+        pinToggle.bringToFront()
+
         state.ytmActive = true
         state.lastLeftPanePx = leftPanePx
 
@@ -293,6 +305,20 @@ internal object ExpandedYtmSplitLayout {
         }
     }
 
+    fun updatePinStateOnly(
+        player: ViewGroup,
+        isPinned: Boolean,
+        settings: ModuleSettings,
+        palette: YtmCardPalette
+    ) {
+        val state = synchronized(playerStates) { playerStates[player] } ?: return
+        if (!state.ytmActive) return
+        state.pinToggleView?.apply {
+            visibility = if (settings.showPinButtonOnIsland || isPinned) View.VISIBLE else View.GONE
+            updateState(isPinned = isPinned, accentColor = palette.accent)
+        }
+    }
+
     fun restoreNativeLayout(views: NativeHolderViews, restoreSeekBarOffsets: (View) -> Unit) {
         val player = views.player
         val state = synchronized(playerStates) { playerStates[player] } ?: return
@@ -302,6 +328,7 @@ internal object ExpandedYtmSplitLayout {
         state.backdropView?.visibility = View.GONE
         state.dividerView?.visibility = View.GONE
         state.lyricsView?.visibility = View.GONE
+        state.pinToggleView?.visibility = View.GONE
 
         views.mediaBgView?.alpha = state.origMediaBgAlpha
         views.appIcon?.visibility = state.origAppIconVisibility
@@ -572,6 +599,36 @@ internal object ExpandedYtmSplitLayout {
         return view
     }
 
+    private fun ensurePinToggleView(
+        player: ViewGroup,
+        api: ConstraintApi,
+        state: PlayerState
+    ): IslandPinToggleView {
+        state.pinToggleView?.takeIf { it.parent === player }?.let { return it }
+        (player.findViewWithTag<View>(TAG_PIN_TOGGLE) as? IslandPinToggleView)?.let {
+            state.pinToggleView = it
+            return it
+        }
+        val sizePx = dp(player.context, 24f)
+        val view = IslandPinToggleView(player.context).apply {
+            id = View.generateViewId()
+            tag = TAG_PIN_TOGGLE
+            elevation = dp(player.context, 4f).toFloat()
+        }
+        player.addView(view, api.createLayoutParams(sizePx, sizePx))
+        state.pinToggleView = view
+        return view
+    }
+
+    private fun updatePinToggleLayout(pinToggle: View, api: ConstraintApi, context: Context) {
+        val sizePx = dp(context, 24f)
+        val lp = api.createLayoutParams(sizePx, sizePx)
+        api.setConstraints(lp, endToEnd = 0, topToTop = 0)
+        lp.marginEnd = dp(context, 9f)
+        lp.topMargin = dp(context, 8f)
+        pinToggle.layoutParams = lp
+    }
+
     private fun updateDividerLayout(divider: View, api: ConstraintApi, context: Context, leftPanePx: Int) {
         val lp = api.createLayoutParams(dp(context, 1f).coerceAtLeast(1), 0)
         api.setConstraints(lp, startToStart = 0, topToTop = 0, bottomToBottom = 0)
@@ -642,6 +699,7 @@ internal object ExpandedYtmSplitLayout {
         var backdropView: YtmAmbientBackdropView? = null
         var dividerView: View? = null
         var lyricsView: FlowingLyricsView? = null
+        var pinToggleView: IslandPinToggleView? = null
 
         companion object {
             fun capture(views: NativeHolderViews, api: ConstraintApi): PlayerState {

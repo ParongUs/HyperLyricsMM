@@ -12,50 +12,39 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.CheckCircle
-import androidx.compose.material.icons.rounded.DeleteOutline
-import androidx.compose.material.icons.rounded.FolderOpen
-import androidx.compose.material.icons.rounded.Info
-import androidx.compose.material.icons.rounded.Mic
-import androidx.compose.material.icons.rounded.NoteAdd
-import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material.icons.rounded.Stop
-import androidx.compose.material.icons.rounded.Sync
+import androidx.compose.material.icons.rounded.Feedback
+import androidx.compose.material.icons.rounded.Home
+import androidx.compose.material.icons.rounded.LibraryMusic
+import androidx.compose.material.icons.rounded.Tune
 import androidx.compose.material.icons.rounded.WarningAmber
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -65,37 +54,50 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
-import com.hyperlyrics.mm.BuildConfig
 import com.hyperlyrics.mm.HyperLyricsApp
 import com.hyperlyrics.mm.XposedStatus
-import com.hyperlyrics.mm.common.AccentColorMode
-import com.hyperlyrics.mm.common.AppLanguage
 import com.hyperlyrics.mm.common.AppStrings
 import com.hyperlyrics.mm.common.AppStringsProvider
-import com.hyperlyrics.mm.common.ExpandedThemeStyle
-import com.hyperlyrics.mm.common.MinimalLyricSlot
 import com.hyperlyrics.mm.common.ModuleConfig
 import com.hyperlyrics.mm.lyrics.LyricsResolver
 import com.hyperlyrics.mm.lyrics.local.LocalSpeechLyricsService
 import com.hyperlyrics.mm.lyrics.parser.LrcParser
-import com.hyperlyrics.mm.ui.components.HyperIslandLivePreviewSection
 import com.hyperlyrics.mm.ui.components.SamplePreviewTrack
+import com.hyperlyrics.mm.ui.tabs.FeedbackTab
+import com.hyperlyrics.mm.ui.tabs.HomeTab
+import com.hyperlyrics.mm.ui.tabs.IslandTab
+import com.hyperlyrics.mm.ui.tabs.SourcesTab
 import com.hyperlyrics.mm.ui.theme.HyperLyricsYtmTheme
 import com.hyperlyrics.mm.ui.theme.YtmColors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import kotlin.math.roundToInt
+
+private enum class MainTab(val icon: ImageVector) {
+    HOME(Icons.Rounded.Home),
+    ISLAND(Icons.Rounded.Tune),
+    SOURCES(Icons.Rounded.LibraryMusic),
+    FEEDBACK(Icons.Rounded.Feedback);
+
+    fun label(strings: AppStrings): String = when (this) {
+        HOME -> strings.tabHome
+        ISLAND -> strings.tabIsland
+        SOURCES -> strings.tabSources
+        FEEDBACK -> strings.tabFeedback
+    }
+}
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -118,6 +120,7 @@ private fun HyperLyricsMainScreen() {
     val speechStatus by LocalSpeechLyricsService.status.collectAsState()
     val strings = remember(settings.appLanguage) { AppStringsProvider.resolve(settings.appLanguage) }
 
+    var selectedTab by rememberSaveable { mutableStateOf(MainTab.HOME) }
     var previewTrack by remember { mutableStateOf(SamplePreviewTrack.defaultTrack) }
     var testQuery by remember { mutableStateOf("") }
     var testStatus by remember { mutableStateOf<String?>(null) }
@@ -181,615 +184,190 @@ private fun HyperLyricsMainScreen() {
         }
     }
 
-    Scaffold(containerColor = YtmColors.Obsidian) { innerPadding ->
-        Column(
+    Scaffold(
+        containerColor = YtmColors.Obsidian,
+        topBar = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(YtmColors.Obsidian)
+                    .statusBarsPadding()
+            ) {
+                TopHeaderBar(
+                    xposedStatus = xposedStatus,
+                    strings = strings,
+                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)
+                )
+                HorizontalDivider(color = YtmColors.Hairline.copy(alpha = 0.6f), thickness = 0.8.dp)
+            }
+        },
+        bottomBar = {
+            Column(modifier = Modifier.fillMaxWidth()) {
+                HorizontalDivider(color = YtmColors.Hairline.copy(alpha = 0.6f), thickness = 0.8.dp)
+                NavigationBar(
+                    containerColor = Color(0xFF0A0A0D),
+                    contentColor = Color.White,
+                    tonalElevation = 0.dp
+                ) {
+                    MainTab.entries.forEach { tab ->
+                        val isSelected = tab == selectedTab
+                        NavigationBarItem(
+                            selected = isSelected,
+                            onClick = { selectedTab = tab },
+                            icon = {
+                                Icon(
+                                    imageVector = tab.icon,
+                                    contentDescription = tab.label(strings),
+                                    modifier = Modifier.size(22.dp)
+                                )
+                            },
+                            label = {
+                                Text(
+                                    text = tab.label(strings),
+                                    fontSize = 11.sp,
+                                    fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                    maxLines = 1
+                                )
+                            },
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = Color.White,
+                                selectedTextColor = Color.White,
+                                indicatorColor = YtmColors.Crimson.copy(alpha = 0.24f),
+                                unselectedIconColor = YtmColors.TextMuted,
+                                unselectedTextColor = YtmColors.TextMuted
+                            )
+                        )
+                    }
+                }
+            }
+        }
+    ) { innerPadding ->
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .statusBarsPadding()
-                .verticalScroll(rememberScrollState())
-                .padding(horizontal = 16.dp, vertical = 14.dp),
-            verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            TopHeaderBar(xposedStatus = xposedStatus, strings = strings)
-
-            HyperIslandLivePreviewSection(
-                settings = settings,
-                previewTrack = previewTrack,
-                strings = strings
-            )
-
-            // Master + Language Card
-            SettingsGroupCard {
-                SettingSwitchRow(
-                    title = strings.masterTitle,
-                    subtitle = strings.masterSubtitle,
-                    checked = settings.masterEnabled,
-                    onCheckedChange = { enabled ->
-                        app.updateSettings { it.copy(masterEnabled = enabled) }
-                    }
-                )
-                CardDivider()
-                SegmentedChoiceRow(
-                    title = strings.languageTitle,
-                    options = listOf(
-                        AppLanguage.SYSTEM to strings.langSystem,
-                        AppLanguage.ENGLISH to strings.langEnglish,
-                        AppLanguage.TURKISH to strings.langTurkish
-                    ),
-                    selected = settings.appLanguage,
-                    onSelect = { lang -> app.updateSettings { it.copy(appLanguage = lang) } }
-                )
-            }
-
-            // Section 1: Expanded Hyper Island
-            SectionHeader(strings.sectionExpanded)
-            SettingsGroupCard {
-                SettingSwitchRow(
-                    title = strings.expandedSplitTitle,
-                    subtitle = strings.expandedSplitSubtitle,
-                    checked = settings.expandedLyricsEnabled,
-                    onCheckedChange = { v -> app.updateSettings { it.copy(expandedLyricsEnabled = v) } }
-                )
-                CardDivider()
-                SegmentedChoiceRow(
-                    title = strings.themeTitle,
-                    options = listOf(
-                        ExpandedThemeStyle.YTM_DYNAMIC to strings.themeYtmDynamic,
-                        ExpandedThemeStyle.YTM_PURE_DARK to strings.themeYtmDark,
-                        ExpandedThemeStyle.HYPEROS_NATIVE to strings.themeNativeGlass
-                    ),
-                    selected = settings.expandedThemeStyle,
-                    onSelect = { style -> app.updateSettings { it.copy(expandedThemeStyle = style) } }
-                )
-                CardDivider()
-                SegmentedChoiceRow(
-                    title = strings.accentTitle,
-                    options = listOf(
-                        AccentColorMode.YTM_CRIMSON to strings.accentCrimson,
-                        AccentColorMode.YTM_WHITE to strings.accentWhite,
-                        AccentColorMode.ALBUM_ADAPTIVE to strings.accentAlbum
-                    ),
-                    selected = settings.accentColorMode,
-                    onSelect = { mode -> app.updateSettings { it.copy(accentColorMode = mode) } }
-                )
-                CardDivider()
-                SettingSliderRow(
-                    title = strings.splitRatioTitle,
-                    valueLabel = "${settings.leftPaneRatioPercent}% / ${100 - settings.leftPaneRatioPercent}%",
-                    value = settings.leftPaneRatioPercent.toFloat(),
-                    valueRange = 38f..52f,
-                    steps = 13,
-                    onValueChange = { v ->
-                        app.updateSettings { it.copy(leftPaneRatioPercent = v.roundToInt()) }
-                    }
-                )
-                CardDivider()
-                SettingSliderRow(
-                    title = strings.expandedFontTitle,
-                    valueLabel = "${"%.1f".format(settings.expandedFontSizeSp)} sp",
-                    value = settings.expandedFontSizeSp,
-                    valueRange = 11f..18f,
-                    steps = 13,
-                    onValueChange = { v ->
-                        val snapped = (v * 2f).roundToInt() / 2f
-                        app.updateSettings { it.copy(expandedFontSizeSp = snapped) }
-                    }
-                )
-                CardDivider()
-                SettingSwitchRow(
-                    title = strings.showLikeTitle,
-                    subtitle = strings.showLikeSubtitle,
-                    checked = settings.showLikeButton,
-                    onCheckedChange = { v -> app.updateSettings { it.copy(showLikeButton = v) } }
-                )
-                CardDivider()
-                SettingSwitchRow(
-                    title = strings.tapToSeekTitle,
-                    subtitle = strings.tapToSeekSubtitle,
-                    checked = settings.tapLyricToSeek,
-                    onCheckedChange = { v -> app.updateSettings { it.copy(tapLyricToSeek = v) } }
-                )
-                CardDivider()
-                SettingSwitchRow(
-                    title = strings.interludeDotsTitle,
-                    subtitle = strings.interludeDotsSubtitle,
-                    checked = settings.showInterludeDots,
-                    onCheckedChange = { v -> app.updateSettings { it.copy(showInterludeDots = v) } }
-                )
-            }
-
-            // Section 2: Minimal / Collapsed Island
-            SectionHeader(strings.sectionMinimal)
-            SettingsGroupCard {
-                SettingSwitchRow(
-                    title = strings.minimalEnabledTitle,
-                    subtitle = strings.minimalEnabledSubtitle,
-                    checked = settings.minimalLyricsEnabled,
-                    onCheckedChange = { v -> app.updateSettings { it.copy(minimalLyricsEnabled = v) } }
-                )
-                if (settings.minimalLyricsEnabled) {
-                    CardDivider()
-                    SegmentedChoiceRow(
-                        title = strings.minimalSlotTitle,
-                        options = listOf(
-                            MinimalLyricSlot.RIGHT to strings.slotRight,
-                            MinimalLyricSlot.LEFT to strings.slotLeft
-                        ),
-                        selected = settings.minimalSlot,
-                        onSelect = { slot -> app.updateSettings { it.copy(minimalSlot = slot) } }
-                    )
-                    CardDivider()
-                    SettingSliderRow(
-                        title = strings.minimalFontTitle,
-                        valueLabel = "${"%.1f".format(settings.minimalFontSizeSp)} sp",
-                        value = settings.minimalFontSizeSp,
-                        valueRange = 9.0f..13.5f,
-                        steps = 8,
-                        onValueChange = { v ->
-                            val snapped = (v * 2f).roundToInt() / 2f
-                            app.updateSettings { it.copy(minimalFontSizeSp = snapped) }
+            Crossfade(
+                targetState = selectedTab,
+                animationSpec = tween(180),
+                label = "main_tab_crossfade"
+            ) { tab ->
+                when (tab) {
+                    MainTab.HOME -> HomeTab(
+                        settings = settings,
+                        strings = strings,
+                        previewTrack = previewTrack,
+                        cacheCount = cacheCount,
+                        pinnedCount = pinnedCount,
+                        testQuery = testQuery,
+                        testStatus = testStatus,
+                        testLoading = testLoading,
+                        onUpdateSettings = app::updateSettings,
+                        onTestQueryChange = { testQuery = it },
+                        onRunLiveTest = {
+                            val q = testQuery.trim()
+                            if (q.isEmpty() || testLoading) return@HomeTab
+                            testLoading = true
+                            testStatus = strings.liveTestFetching
+                            scope.launch {
+                                val fetched = withContext(Dispatchers.IO) {
+                                    resolver.resolve(
+                                        videoId = null,
+                                        title = q,
+                                        artist = "",
+                                        settings = settings,
+                                        forceRefresh = true
+                                    )
+                                }
+                                testLoading = false
+                                refreshCacheStats()
+                                if (fetched != null && fetched.hasVocalLines) {
+                                    previewTrack = fetched
+                                    val src = fetched.sourceMessage ?: fetched.videoId ?: "YouTube Music"
+                                    testStatus = strings.liveTestLoaded(fetched.lines.size, fetched.isSynced, src)
+                                } else {
+                                    testStatus = strings.liveTestNotFound
+                                }
+                            }
                         }
                     )
-                    CardDivider()
-                    SettingSliderRow(
-                        title = strings.minimalMaxWidthTitle,
-                        valueLabel = "${settings.minimalMaxWidthDp} dp",
-                        value = settings.minimalMaxWidthDp.toFloat(),
-                        valueRange = 80f..200f,
-                        steps = 23,
-                        onValueChange = { v ->
-                            app.updateSettings { it.copy(minimalMaxWidthDp = (v / 5f).roundToInt() * 5) }
-                        }
-                    )
-                    CardDivider()
-                    SettingSwitchRow(
-                        title = strings.unlockWidthTitle,
-                        subtitle = strings.unlockWidthSubtitle,
-                        checked = settings.unlockIslandWidthLimit,
-                        onCheckedChange = { v -> app.updateSettings { it.copy(unlockIslandWidthLimit = v) } }
-                    )
-                }
-            }
 
-            // Section 3: Offline YouTube Music Premium Downloads
-            SectionHeader(strings.sectionOfflinePremium)
-            SettingsGroupCard {
-                SettingSwitchRow(
-                    title = strings.offlineSyncTitle,
-                    subtitle = strings.offlineSyncSubtitle,
-                    checked = settings.offlinePremiumSyncEnabled,
-                    onCheckedChange = { v -> app.updateSettings { it.copy(offlinePremiumSyncEnabled = v) } }
-                )
-                CardDivider()
-                SettingSwitchRow(
-                    title = strings.offlineYtmDbTitle,
-                    subtitle = strings.offlineYtmDbSubtitle,
-                    checked = settings.offlineYtmDbReadEnabled,
-                    onCheckedChange = { v -> app.updateSettings { it.copy(offlineYtmDbReadEnabled = v) } }
-                )
-                CardDivider()
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = strings.offlinePinnedSummary(cacheCount, pinnedCount),
-                        color = YtmColors.TextSecondary,
-                        fontSize = 12.sp
+                    MainTab.ISLAND -> IslandTab(
+                        settings = settings,
+                        strings = strings,
+                        onUpdateSettings = app::updateSettings
                     )
-                    OutlinedButton(
-                        onClick = {
+
+                    MainTab.SOURCES -> SourcesTab(
+                        settings = settings,
+                        strings = strings,
+                        cacheCount = cacheCount,
+                        pinnedCount = pinnedCount,
+                        syncNotice = syncNotice,
+                        speechStatus = speechStatus,
+                        speechNotice = speechNotice,
+                        onUpdateSettings = app::updateSettings,
+                        onSyncOfflineNow = {
                             runCatching {
                                 context.sendBroadcast(Intent(ModuleConfig.ACTION_REQUEST_YTM_OFFLINE_SCAN))
                             }
                             syncNotice = strings.offlineSyncRequested
                             refreshCacheStats()
                         },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.Sync,
-                            contentDescription = null,
-                            tint = YtmColors.CrimsonSoft,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.size(6.dp))
-                        Text(text = strings.offlineSyncNowBtn, color = Color.White, fontSize = 12.5.sp)
-                    }
-                    if (!syncNotice.isNullOrBlank()) {
-                        Text(
-                            text = syncNotice!!,
-                            color = YtmColors.ActiveGreen,
-                            fontSize = 11.5.sp,
-                            lineHeight = 15.5.sp
-                        )
-                    }
-                }
-            }
-
-            // Section 4: Optional Fallback & Local Lyrics Extraction
-            SectionHeader(strings.sectionFallback)
-            SettingsGroupCard {
-                SettingSwitchRow(
-                    title = strings.externalFallbackTitle,
-                    subtitle = strings.externalFallbackSubtitle,
-                    checked = settings.externalFallbackEnabled,
-                    onCheckedChange = { v -> app.updateSettings { it.copy(externalFallbackEnabled = v) } }
-                )
-                if (settings.externalFallbackEnabled) {
-                    CardDivider()
-                    SettingSwitchRow(
-                        title = strings.lrclibTitle,
-                        subtitle = strings.lrclibSubtitle,
-                        checked = settings.fallbackLrclibEnabled,
-                        onCheckedChange = { v -> app.updateSettings { it.copy(fallbackLrclibEnabled = v) } }
-                    )
-                    CardDivider()
-                    SettingSwitchRow(
-                        title = strings.ytCaptionsTitle,
-                        subtitle = strings.ytCaptionsSubtitle,
-                        checked = settings.fallbackYtCaptionsEnabled,
-                        onCheckedChange = { v -> app.updateSettings { it.copy(fallbackYtCaptionsEnabled = v) } }
-                    )
-                    CardDivider()
-                    SettingSwitchRow(
-                        title = strings.neteaseTitle,
-                        subtitle = strings.neteaseSubtitle,
-                        checked = settings.fallbackNeteaseEnabled,
-                        onCheckedChange = { v -> app.updateSettings { it.copy(fallbackNeteaseEnabled = v) } }
-                    )
-                }
-
-                CardDivider()
-
-                // Local .lrc / .ttml Folder + Manual Importer
-                SettingSwitchRow(
-                    title = strings.localLrcTitle,
-                    subtitle = strings.localLrcSubtitle,
-                    checked = settings.localLrcFolderEnabled,
-                    onCheckedChange = { v -> app.updateSettings { it.copy(localLrcFolderEnabled = v) } }
-                )
-                if (settings.localLrcFolderEnabled) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 14.dp, end = 14.dp, bottom = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = if (settings.localLrcTreeUri.isNotBlank()) {
-                                "${strings.folderSelectedLabel}: ${settings.localLrcTreeUri.substringAfterLast("%2F").take(32)}"
-                            } else {
-                                strings.folderNotSelectedLabel
-                            },
-                            color = YtmColors.TextSecondary,
-                            fontSize = 11.5.sp
-                        )
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            OutlinedButton(
-                                onClick = { folderPickerLauncher.launch(null) },
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(Icons.Rounded.FolderOpen, contentDescription = null, tint = YtmColors.CrimsonSoft, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.size(5.dp))
-                                Text(strings.pickFolderBtn, color = Color.White, fontSize = 12.sp)
-                            }
-                            OutlinedButton(
-                                onClick = { showImportDialog = true },
-                                shape = RoundedCornerShape(10.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(Icons.Rounded.NoteAdd, contentDescription = null, tint = YtmColors.CrimsonSoft, modifier = Modifier.size(16.dp))
-                                Spacer(modifier = Modifier.size(5.dp))
-                                Text(strings.importLrcBtn, color = Color.White, fontSize = 12.sp)
-                            }
-                        }
-                    }
-                }
-
-                CardDivider()
-
-                // On-Device Local Speech-to-Lyrics Extractor
-                SettingSwitchRow(
-                    title = strings.localSpeechTitle,
-                    subtitle = strings.localSpeechSubtitle,
-                    checked = settings.localSpeechExtractorEnabled,
-                    onCheckedChange = { v ->
-                        app.updateSettings { it.copy(localSpeechExtractorEnabled = v) }
-                        if (!v && speechStatus.running) {
-                            context.startService(
-                                Intent(context, LocalSpeechLyricsService::class.java).apply {
-                                    action = LocalSpeechLyricsService.ACTION_STOP
-                                }
-                            )
-                        }
-                    }
-                )
-                if (settings.localSpeechExtractorEnabled) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(start = 14.dp, end = 14.dp, bottom = 12.dp),
-                        verticalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                if (speechStatus.running) {
-                                    context.startService(
-                                        Intent(context, LocalSpeechLyricsService::class.java).apply {
-                                            action = LocalSpeechLyricsService.ACTION_STOP
-                                        }
-                                    )
-                                    refreshCacheStats()
-                                } else {
-                                    if (!LocalSpeechLyricsService.isOnDeviceAsrSupported(context)) {
-                                        speechNotice = strings.localSpeechUnavailable
-                                        return@Button
+                        onClearCache = {
+                            app.cacheDb.clearAll()
+                            refreshCacheStats()
+                        },
+                        onPickLocalFolder = { folderPickerLauncher.launch(null) },
+                        onOpenImportDialog = { showImportDialog = true },
+                        onToggleLocalSpeech = { enabled ->
+                            app.updateSettings { it.copy(localSpeechExtractorEnabled = enabled) }
+                            if (!enabled && speechStatus.running) {
+                                context.startService(
+                                    Intent(context, LocalSpeechLyricsService::class.java).apply {
+                                        action = LocalSpeechLyricsService.ACTION_STOP
                                     }
-                                    speechNotice = null
-                                    val hasAudio = ContextCompat.checkSelfPermission(
-                                        context,
-                                        Manifest.permission.RECORD_AUDIO
-                                    ) == PackageManager.PERMISSION_GRANTED
-                                    if (!hasAudio) {
-                                        micPermLauncher.launch(Manifest.permission.RECORD_AUDIO)
-                                    } else {
-                                        val mpm = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
-                                        if (mpm != null) {
-                                            projectionLauncher.launch(mpm.createScreenCaptureIntent())
-                                        }
-                                    }
-                                }
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (speechStatus.running) YtmColors.SurfaceElevated else YtmColors.Crimson,
-                                contentColor = Color.White
-                            ),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Icon(
-                                imageVector = if (speechStatus.running) Icons.Rounded.Stop else Icons.Rounded.Mic,
-                                contentDescription = null,
-                                modifier = Modifier.size(18.dp)
-                            )
-                            Spacer(modifier = Modifier.size(6.dp))
-                            Text(
-                                text = if (speechStatus.running) strings.localSpeechStopBtn else strings.localSpeechStartBtn,
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }
-                        if (speechStatus.running) {
-                            Text(
-                                text = "${strings.localSpeechRunningStatus} (${speechStatus.capturedCount})",
-                                color = YtmColors.ActiveGreen,
-                                fontSize = 11.5.sp
-                            )
-                            if (speechStatus.lastLine.isNotBlank()) {
-                                Text(
-                                    text = "“${speechStatus.lastLine}”",
-                                    color = Color.White,
-                                    fontSize = 12.sp,
-                                    fontWeight = FontWeight.Medium
                                 )
                             }
-                        } else if (!speechNotice.isNullOrBlank()) {
-                            Text(text = speechNotice!!, color = YtmColors.WarningAmber, fontSize = 11.5.sp)
-                        }
-                    }
-                }
-            }
-
-            // Section 5: Sync & Live Fetch Test
-            SectionHeader(strings.sectionEngine)
-            SettingsGroupCard {
-                SettingSliderRow(
-                    title = strings.syncOffsetTitle,
-                    valueLabel = "${if (settings.syncOffsetMs > 0) "+" else ""}${settings.syncOffsetMs} ms",
-                    value = settings.syncOffsetMs.toFloat(),
-                    valueRange = -1500f..1500f,
-                    steps = 59,
-                    onValueChange = { v ->
-                        val snapped = (v / 50f).roundToInt() * 50
-                        app.updateSettings { it.copy(syncOffsetMs = snapped) }
-                    }
-                )
-                CardDivider()
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = strings.liveTestTitle,
-                        color = YtmColors.TextPrimary,
-                        fontSize = 14.sp,
-                        fontWeight = FontWeight.Medium
-                    )
-                    Text(
-                        text = strings.liveTestSubtitle,
-                        color = YtmColors.TextSecondary,
-                        fontSize = 11.5.sp,
-                        lineHeight = 16.sp
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        OutlinedTextField(
-                            value = testQuery,
-                            onValueChange = { testQuery = it },
-                            placeholder = {
-                                Text(
-                                    text = strings.liveTestPlaceholder,
-                                    fontSize = 12.5.sp,
-                                    color = YtmColors.TextMuted
-                                )
-                            },
-                            singleLine = true,
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = YtmColors.Crimson,
-                                unfocusedBorderColor = YtmColors.Hairline,
-                                focusedTextColor = Color.White,
-                                unfocusedTextColor = Color.White,
-                                cursorColor = YtmColors.Crimson
-                            )
-                        )
-                        Button(
-                            onClick = {
-                                val q = testQuery.trim()
-                                if (q.isEmpty() || testLoading) return@Button
-                                testLoading = true
-                                testStatus = strings.liveTestFetching
-                                scope.launch {
-                                    val fetched = withContext(Dispatchers.IO) {
-                                        resolver.resolve(
-                                            videoId = null,
-                                            title = q,
-                                            artist = "",
-                                            settings = settings,
-                                            forceRefresh = true
-                                        )
+                        },
+                        onSpeechButtonClick = {
+                            if (speechStatus.running) {
+                                context.startService(
+                                    Intent(context, LocalSpeechLyricsService::class.java).apply {
+                                        action = LocalSpeechLyricsService.ACTION_STOP
                                     }
-                                    testLoading = false
-                                    refreshCacheStats()
-                                    if (fetched != null && fetched.hasVocalLines) {
-                                        previewTrack = fetched
-                                        val src = fetched.sourceMessage ?: fetched.videoId ?: "YouTube Music"
-                                        testStatus = strings.liveTestLoaded(fetched.lines.size, fetched.isSynced, src)
-                                    } else {
-                                        testStatus = strings.liveTestNotFound
-                                    }
-                                }
-                            },
-                            enabled = !testLoading && testQuery.isNotBlank(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = YtmColors.Crimson,
-                                contentColor = Color.White
-                            ),
-                            modifier = Modifier.height(52.dp)
-                        ) {
-                            if (testLoading) {
-                                CircularProgressIndicator(
-                                    color = Color.White,
-                                    strokeWidth = 2.dp,
-                                    modifier = Modifier.size(18.dp)
                                 )
-                            } else {
-                                Icon(Icons.Rounded.Search, contentDescription = null, modifier = Modifier.size(18.dp))
-                            }
-                        }
-                    }
-                    if (!testStatus.isNullOrBlank()) {
-                        Text(
-                            text = testStatus!!,
-                            color = if (testStatus!!.startsWith("✓")) YtmColors.ActiveGreen else YtmColors.TextSecondary,
-                            fontSize = 11.5.sp
-                        )
-                    }
-                }
-                CardDivider()
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 14.dp, vertical = 12.dp),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            text = strings.offlineCacheTitle,
-                            color = YtmColors.TextPrimary,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                        Text(
-                            text = strings.offlinePinnedSummary(cacheCount, pinnedCount),
-                            color = YtmColors.TextSecondary,
-                            fontSize = 11.5.sp
-                        )
-                    }
-                    Row(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(YtmColors.SurfaceElevated)
-                            .clickable {
-                                app.cacheDb.clearAll()
                                 refreshCacheStats()
+                            } else {
+                                if (!LocalSpeechLyricsService.isOnDeviceAsrSupported(context)) {
+                                    speechNotice = strings.localSpeechUnavailable
+                                    return@SourcesTab
+                                }
+                                speechNotice = null
+                                val hasAudio = ContextCompat.checkSelfPermission(
+                                    context,
+                                    Manifest.permission.RECORD_AUDIO
+                                ) == PackageManager.PERMISSION_GRANTED
+                                if (!hasAudio) {
+                                    micPermLauncher.launch(Manifest.permission.RECORD_AUDIO)
+                                } else {
+                                    val mpm = context.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
+                                    if (mpm != null) {
+                                        projectionLauncher.launch(mpm.createScreenCaptureIntent())
+                                    }
+                                }
                             }
-                            .padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(5.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Rounded.DeleteOutline,
-                            contentDescription = null,
-                            tint = YtmColors.CrimsonSoft,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Text(
-                            text = strings.clearBtn,
-                            color = YtmColors.CrimsonSoft,
-                            fontSize = 12.sp,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
-                }
-            }
-
-            // LSPosed Setup Guide
-            SettingsGroupCard {
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(14.dp),
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Rounded.Info,
-                        contentDescription = null,
-                        tint = YtmColors.CrimsonSoft,
-                        modifier = Modifier.size(20.dp)
+                        }
                     )
-                    Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                        Text(
-                            text = strings.setupTitle,
-                            color = YtmColors.TextPrimary,
-                            fontSize = 13.5.sp,
-                            fontWeight = FontWeight.SemiBold
-                        )
-                        Text(
-                            text = strings.setupBody,
-                            color = YtmColors.TextSecondary,
-                            fontSize = 11.5.sp,
-                            lineHeight = 16.5.sp
-                        )
-                    }
+
+                    MainTab.FEEDBACK -> FeedbackTab(
+                        settings = settings,
+                        xposedStatus = xposedStatus,
+                        strings = strings,
+                        onUpdateSettings = app::updateSettings
+                    )
                 }
             }
-
-            Text(
-                text = "HyperLyricsMM v${BuildConfig.VERSION_NAME} • YouTube Music × HyperOS Super Island",
-                color = YtmColors.TextMuted,
-                fontSize = 11.sp,
-                modifier = Modifier
-                    .align(Alignment.CenterHorizontally)
-                    .padding(top = 2.dp, bottom = 18.dp)
-            )
         }
     }
 
@@ -890,9 +468,13 @@ private fun ImportLocalLyricsDialog(
 }
 
 @Composable
-private fun TopHeaderBar(xposedStatus: XposedStatus, strings: AppStrings) {
+private fun TopHeaderBar(
+    xposedStatus: XposedStatus,
+    strings: AppStrings,
+    modifier: Modifier = Modifier
+) {
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
@@ -918,13 +500,13 @@ private fun TopHeaderBar(xposedStatus: XposedStatus, strings: AppStrings) {
                 Text(
                     text = "HyperLyricsMM",
                     color = Color.White,
-                    fontSize = 19.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
                     text = strings.appSubtitle,
                     color = YtmColors.TextSecondary,
-                    fontSize = 11.5.sp
+                    fontSize = 11.sp
                 )
             }
         }
@@ -952,184 +534,5 @@ private fun TopHeaderBar(xposedStatus: XposedStatus, strings: AppStrings) {
                 fontWeight = FontWeight.SemiBold
             )
         }
-    }
-}
-
-@Composable
-private fun SectionHeader(title: String) {
-    Text(
-        text = title,
-        color = YtmColors.TextMuted,
-        fontSize = 11.sp,
-        fontWeight = FontWeight.SemiBold,
-        letterSpacing = 0.8.sp,
-        modifier = Modifier.padding(start = 6.dp, top = 4.dp)
-    )
-}
-
-@Composable
-private fun SettingsGroupCard(content: @Composable ColumnScope.() -> Unit) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(18.dp))
-            .background(YtmColors.SurfaceCard)
-            .border(1.dp, YtmColors.Hairline, RoundedCornerShape(18.dp)),
-        content = content
-    )
-}
-
-@Composable
-private fun CardDivider() {
-    HorizontalDivider(
-        color = YtmColors.Hairline.copy(alpha = 0.7f),
-        thickness = 0.8.dp,
-        modifier = Modifier.padding(horizontal = 14.dp)
-    )
-}
-
-@Composable
-private fun SettingSwitchRow(
-    title: String,
-    subtitle: String,
-    checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable { onCheckedChange(!checked) }
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Column(
-            modifier = Modifier
-                .weight(1f)
-                .padding(end = 12.dp)
-        ) {
-            Text(
-                text = title,
-                color = YtmColors.TextPrimary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = subtitle,
-                color = YtmColors.TextSecondary,
-                fontSize = 11.5.sp,
-                lineHeight = 15.5.sp
-            )
-        }
-        Switch(
-            checked = checked,
-            onCheckedChange = onCheckedChange,
-            colors = SwitchDefaults.colors(
-                checkedThumbColor = Color.White,
-                checkedTrackColor = YtmColors.Crimson,
-                uncheckedThumbColor = Color(0xFFB5B5C0),
-                uncheckedTrackColor = Color(0xFF2B2B34),
-                uncheckedBorderColor = Color.Transparent
-            )
-        )
-    }
-}
-
-@Composable
-private fun <T> SegmentedChoiceRow(
-    title: String,
-    options: List<Pair<T, String>>,
-    selected: T,
-    onSelect: (T) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp)
-    ) {
-        Text(
-            text = title,
-            color = YtmColors.TextPrimary,
-            fontSize = 14.sp,
-            fontWeight = FontWeight.Medium
-        )
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .clip(RoundedCornerShape(12.dp))
-                .background(YtmColors.SurfaceElevated)
-                .padding(3.dp),
-            horizontalArrangement = Arrangement.spacedBy(4.dp)
-        ) {
-            options.forEach { (value, label) ->
-                val isSelected = value == selected
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(9.dp))
-                        .background(if (isSelected) YtmColors.Crimson else Color.Transparent)
-                        .clickable { onSelect(value) }
-                        .padding(vertical = 8.dp),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text(
-                        text = label,
-                        color = if (isSelected) Color.White else YtmColors.TextSecondary,
-                        fontSize = 12.sp,
-                        fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal
-                    )
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun SettingSliderRow(
-    title: String,
-    valueLabel: String,
-    value: Float,
-    valueRange: ClosedFloatingPointRange<Float>,
-    steps: Int,
-    onValueChange: (Float) -> Unit
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 14.dp, vertical = 10.dp)
-    ) {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = title,
-                color = YtmColors.TextPrimary,
-                fontSize = 14.sp,
-                fontWeight = FontWeight.Medium
-            )
-            Text(
-                text = valueLabel,
-                color = YtmColors.CrimsonSoft,
-                fontSize = 12.5.sp,
-                fontWeight = FontWeight.SemiBold
-            )
-        }
-        Slider(
-            value = value,
-            onValueChange = onValueChange,
-            valueRange = valueRange,
-            steps = steps,
-            colors = SliderDefaults.colors(
-                thumbColor = Color.White,
-                activeTrackColor = YtmColors.Crimson,
-                inactiveTrackColor = Color(0xFF2D2D36),
-                activeTickColor = Color.Transparent,
-                inactiveTickColor = Color.Transparent
-            )
-        )
     }
 }

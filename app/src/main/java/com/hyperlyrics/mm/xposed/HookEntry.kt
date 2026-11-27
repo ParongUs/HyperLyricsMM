@@ -5,6 +5,7 @@ import com.hyperlyrics.mm.BuildConfig
 import com.hyperlyrics.mm.common.ModuleConfig
 import com.hyperlyrics.mm.common.ModuleLogger
 import com.hyperlyrics.mm.xposed.expanded.ExpandedIslandCoordinator
+import com.hyperlyrics.mm.xposed.expanded.ExpandedIslandPinController
 import com.hyperlyrics.mm.xposed.minimal.MinimalIslandCoordinator
 import com.hyperlyrics.mm.xposed.session.YouTubeMusicSessionTracker
 import com.hyperlyrics.mm.xposed.ytm.YouTubeMusicProcessHooker
@@ -84,7 +85,8 @@ class HookEntry : XposedModule() {
             ModuleLogger.e(TAG, "Failed hooking SystemUI Application.onCreate", it)
         }
 
-        // Install Expanded Hyper Island YouTube Music Split-Lyrics Player hooks
+        // Install Expanded Hyper Island YouTube Music Split-Lyrics Player hooks & Pin WindowManager guard
+        ExpandedIslandPinController.hookSystemUiWindowManager(this)
         ExpandedIslandCoordinator.hook(this, classLoader)
 
         // Intercept dynamic plugin ClassLoader creation for miui.systemui.plugin (Minimal Hyper Island)
