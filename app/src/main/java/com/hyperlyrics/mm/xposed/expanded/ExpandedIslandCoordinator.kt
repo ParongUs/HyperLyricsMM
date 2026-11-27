@@ -1,12 +1,15 @@
 package com.hyperlyrics.mm.xposed.expanded
 
+import android.content.res.ColorStateList
 import android.graphics.drawable.Drawable
 import android.media.session.MediaSession
 import android.os.Handler
 import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
+import android.widget.AbsSeekBar
 import android.widget.ImageView
+import android.widget.ProgressBar
 import android.widget.TextView
 import com.hyperlyrics.mm.common.ExpandedThemeStyle
 import com.hyperlyrics.mm.common.ModuleConfig
@@ -505,6 +508,15 @@ object ExpandedIslandCoordinator {
         fun setSeekBarColors(seekBar: View, activeColor: Int, trackColor: Int) {
             runCatching { setSeekBarFgMethod?.invoke(seekBar, activeColor) }
             runCatching { setSeekBarBgMethod?.invoke(seekBar, trackColor) }
+            runCatching {
+                if (seekBar is ProgressBar) {
+                    seekBar.progressTintList = ColorStateList.valueOf(activeColor)
+                    seekBar.progressBackgroundTintList = ColorStateList.valueOf(trackColor)
+                }
+                if (seekBar is AbsSeekBar) {
+                    seekBar.thumbTintList = ColorStateList.valueOf(0xFFFFFFFF.toInt())
+                }
+            }
             seekBar.invalidate()
         }
 

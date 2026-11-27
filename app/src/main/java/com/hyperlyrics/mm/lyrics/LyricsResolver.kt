@@ -158,7 +158,8 @@ class LyricsResolver(
                 ?: return true
             val net = cm.activeNetwork ?: return false
             val caps = cm.getNetworkCapabilities(net) ?: return false
-            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+            caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET) &&
+                caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_VALIDATED)
         }.getOrDefault(true)
     }
 

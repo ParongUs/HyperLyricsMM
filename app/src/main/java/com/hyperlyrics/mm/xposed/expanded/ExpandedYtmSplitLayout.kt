@@ -9,6 +9,7 @@ import android.graphics.drawable.Drawable
 import android.graphics.drawable.GradientDrawable
 import android.text.TextUtils
 import android.util.TypedValue
+import android.view.Gravity
 import android.view.View
 import android.view.ViewGroup
 import android.view.ViewOutlineProvider
@@ -160,6 +161,14 @@ internal object ExpandedYtmSplitLayout {
             views.mediaBgView?.alpha = state.origMediaBgAlpha
         }
 
+        // Determine if 4th Like button actually has an icon & is visible (avoids off-center 3-button row!)
+        val hasRealLikeAction = settings.showLikeButton &&
+            views.actions.getOrNull(4)?.let { btn ->
+                val origVis = state.origActionVisibilities.getOrNull(4) ?: View.GONE
+                val hasDrawable = (btn as? ImageView)?.drawable != null
+                origVis == View.VISIBLE && hasDrawable
+            } == true
+
         // 3. Apply compact left-pane ConstraintSet cloned from native baseline
         val workingSet = api.cloneFrom(state.nativeConstraintSet)
         if (workingSet != null) {
@@ -169,7 +178,7 @@ internal object ExpandedYtmSplitLayout {
                 ids = ids,
                 context = player.context,
                 leftPanePx = leftPanePx,
-                showLikeButton = settings.showLikeButton
+                showLikeButton = hasRealLikeAction
             )
             api.applyTo(workingSet, player)
         }
@@ -184,25 +193,36 @@ internal object ExpandedYtmSplitLayout {
         views.albumImage.clipToOutline = true
         views.appIcon?.visibility = View.GONE
 
-        // 5. Compact crisp typography for left title, artist, and timestamps
+        // 5. Compact crisp typography with smooth horizontal fade edges for marquee text
+        val fadeLen = dp(player.context, 10f)
         views.titleText.apply {
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.8f)
             typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
             setTextColor(Color.WHITE)
+            gravity = Gravity.START or Gravity.CENTER_VERTICAL
+            textAlignment = View.TEXT_ALIGNMENT_VIEW_START
+            setPadding(0, 0, 0, 0)
             isSingleLine = true
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.MARQUEE
             marqueeRepeatLimit = -1
+            isHorizontalFadingEdgeEnabled = true
+            setFadingEdgeLength(fadeLen)
             isSelected = true
         }
         views.artistText.apply {
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.8f)
             typeface = Typeface.create("sans-serif", Typeface.NORMAL)
             setTextColor(0xB8FFFFFF.toInt())
+            gravity = Gravity.START or Gravity.CENTER_VERTICAL
+            textAlignment = View.TEXT_ALIGNMENT_VIEW_START
+            setPadding(0, 0, 0, 0)
             isSingleLine = true
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.MARQUEE
             marqueeRepeatLimit = -1
+            isHorizontalFadingEdgeEnabled = true
+            setFadingEdgeLength(fadeLen)
             isSelected = true
         }
         views.elapsedTime.apply {
@@ -218,11 +238,12 @@ internal object ExpandedYtmSplitLayout {
             visibility = View.VISIBLE
         }
 
-        // 6. YouTube Music accent styling on progress bar & play/pause pill
+        // 6. Clean seekBar vertical padding + YouTube Music accent styling
+        views.seekBar.setPadding(views.seekBar.paddingLeft, 0, views.seekBar.paddingRight, 0)
         resetSeekBarOffsets(views.seekBar)
         applySeekBarColors(views.seekBar, palette.progressActive, palette.progressTrack)
 
-        styleActionButtons(views, settings.showLikeButton, palette)
+        styleActionButtons(views, hasRealLikeAction, palette, state)
 
         // 7. Position hairline divider & flowing lyrics theatre on the right half
         updateDividerLayout(divider, api, player.context, leftPanePx)
@@ -253,6 +274,7 @@ internal object ExpandedYtmSplitLayout {
 
         state.ytmActive = true
         state.lastLeftPanePx = leftPanePx
+        state.lastHasRealLikeAction = hasRealLikeAction
 
         // Re-apply once real measured width arrives if player wasn't measured yet
         if (player.width == 0 && !state.layoutListenerAttached) {
@@ -271,7 +293,7 @@ internal object ExpandedYtmSplitLayout {
                                 updateLyricsLayout(lyricsView, api, v.context, refreshedLeft)
                                 api.cloneFrom(state.nativeConstraintSet)?.let { rebuilt ->
                                     buildCompactLeftConstraints(
-                                        api, rebuilt, ids, v.context, refreshedLeft, settings.showLikeButton
+                                        api, rebuilt, ids, v.context, refreshedLeft, state.lastHasRealLikeAction
                                     )
                                     api.applyTo(rebuilt, player)
                                 }
@@ -353,7 +375,15 @@ internal object ExpandedYtmSplitLayout {
         views.seamless.scaleX = 1f
         views.seamless.scaleY = 1f
         views.seamless.visibility = state.origSeamlessVisibility
+        state.origSeamlessTextVisibilities.forEach { (tv, vis) -> tv.visibility = vis }
+        state.origSeamlessTextVisibilities.clear()
 
+        views.seekBar.setPadding(
+            views.seekBar.paddingLeft,
+            state.origSeekBarPadTop,
+            views.seekBar.paddingRight,
+            state.origSeekBarPadBottom
+        )
         restoreSeekBarOffsets(views.seekBar)
         if (api != null) {
             api.applyTo(state.nativeConstraintSet, player)
@@ -400,9 +430,9 @@ internal object ExpandedYtmSplitLayout {
         )
         api.setMargin(set, ids.mediaSeamless, SIDE_TOP, dp(context, 1f))
 
-        // 3. Title & Artist (strictly bounded inside left pane so they never collide with lyrics)
+        // 3. Title & Artist (strictly bounded inside left pane with clean gap before output badge)
         val textStart = startPad + coverSize + infoGap
-        val titleWidth = (leftPanePx - rightInset - seamlessSize - dp(context, 4f) - textStart)
+        val titleWidth = (leftPanePx - rightInset - seamlessSize - dp(context, 7f) - textStart)
             .coerceAtLeast(dp(context, 48f))
         val artistWidth = (leftPanePx - rightInset - textStart)
             .coerceAtLeast(dp(context, 56f))
@@ -422,28 +452,28 @@ internal object ExpandedYtmSplitLayout {
         api.connect(set, ids.headerArtist, SIDE_TOP, ids.headerTitle, SIDE_BOTTOM)
         api.setMargin(set, ids.headerArtist, SIDE_TOP, dp(context, 2f))
 
-        // 4. Progress Bar (usable width across entire left pane!)
+        // 4. Progress Bar (tight height so timestamps sit right below with zero awkward gap)
         val seekWidth = (leftPanePx - startPad - rightInset).coerceAtLeast(dp(context, 100f))
         api.clearAll(set, ids.mediaProgressBar)
         api.constrainWidth(set, ids.mediaProgressBar, seekWidth)
-        api.constrainHeight(set, ids.mediaProgressBar, dp(context, 22f))
+        api.constrainHeight(set, ids.mediaProgressBar, dp(context, 18f))
         api.connect(set, ids.mediaProgressBar, SIDE_START, 0, SIDE_START)
         api.connect(set, ids.mediaProgressBar, SIDE_TOP, ids.albumArt, SIDE_BOTTOM)
         api.setMargin(set, ids.mediaProgressBar, SIDE_START, startPad)
-        api.setMargin(set, ids.mediaProgressBar, SIDE_TOP, dp(context, 11f))
+        api.setMargin(set, ids.mediaProgressBar, SIDE_TOP, dp(context, 12f))
 
         // 5. Elapsed & Total Time neatly tucked right under progress bar ends
         api.clearAll(set, ids.mediaElapsedTime)
         api.constrainWidth(set, ids.mediaElapsedTime, ViewGroup.LayoutParams.WRAP_CONTENT)
         api.connect(set, ids.mediaElapsedTime, SIDE_START, ids.mediaProgressBar, SIDE_START)
         api.connect(set, ids.mediaElapsedTime, SIDE_TOP, ids.mediaProgressBar, SIDE_BOTTOM)
-        api.setMargin(set, ids.mediaElapsedTime, SIDE_TOP, -dp(context, 3f))
+        api.setMargin(set, ids.mediaElapsedTime, SIDE_TOP, dp(context, 1f))
 
         api.clearAll(set, ids.mediaTotalTime)
         api.constrainWidth(set, ids.mediaTotalTime, ViewGroup.LayoutParams.WRAP_CONTENT)
         api.connect(set, ids.mediaTotalTime, SIDE_END, ids.mediaProgressBar, SIDE_END)
         api.connect(set, ids.mediaTotalTime, SIDE_TOP, ids.mediaProgressBar, SIDE_BOTTOM)
-        api.setMargin(set, ids.mediaTotalTime, SIDE_TOP, -dp(context, 3f))
+        api.setMargin(set, ids.mediaTotalTime, SIDE_TOP, dp(context, 1f))
 
         // 6. Compact, still-comfortable Action Buttons row at bottom of left pane
         // action0 (dislike) -> GONE to keep layout clean; action1=Prev, action2=Play/Pause, action3=Next, action4=Like
@@ -501,7 +531,8 @@ internal object ExpandedYtmSplitLayout {
     private fun styleActionButtons(
         views: NativeHolderViews,
         showLikeButton: Boolean,
-        palette: YtmCardPalette
+        palette: YtmCardPalette,
+        state: PlayerState
     ) {
         val ctx = views.player.context
         views.actions.getOrNull(0)?.visibility = View.GONE
@@ -512,7 +543,7 @@ internal object ExpandedYtmSplitLayout {
             val pill = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(0x28FFFFFF)
-                setStroke(dp(ctx, 0.75f).coerceAtLeast(1), Color.argb(46, Color.red(palette.accent), Color.green(palette.accent), Color.blue(palette.accent)))
+                setStroke(dp(ctx, 0.85f).coerceAtLeast(1), Color.argb(68, Color.red(palette.accent), Color.green(palette.accent), Color.blue(palette.accent)))
             }
             playPauseBtn.background = pill
             val pad = dp(ctx, 7f)
@@ -529,8 +560,29 @@ internal object ExpandedYtmSplitLayout {
         }
         (views.actions.getOrNull(2) as? ImageView)?.imageTintList = ColorStateList.valueOf(Color.WHITE)
 
-        views.seamless.scaleX = 0.78f
-        views.seamless.scaleY = 0.78f
+        // Keep media_seamless strictly icon-only (hide any clipped device-name TextView causing `/` slivers)
+        views.seamless.scaleX = 0.82f
+        views.seamless.scaleY = 0.82f
+        (views.seamless as? ViewGroup)?.let { vg ->
+            vg.clipChildren = true
+            vg.clipToPadding = true
+            hideSeamlessTextLabels(vg, state)
+        }
+    }
+
+    private fun hideSeamlessTextLabels(group: ViewGroup, state: PlayerState) {
+        for (i in 0 until group.childCount) {
+            val child = group.getChildAt(i) ?: continue
+            when (child) {
+                is TextView -> {
+                    if (!state.origSeamlessTextVisibilities.containsKey(child)) {
+                        state.origSeamlessTextVisibilities[child] = child.visibility
+                    }
+                    child.visibility = View.GONE
+                }
+                is ViewGroup -> hideSeamlessTextLabels(child, state)
+            }
+        }
     }
 
     private fun ensureBackdropView(
@@ -691,15 +743,19 @@ internal object ExpandedYtmSplitLayout {
         val origTotalSizePx: Float,
         val origPlayPauseBackground: Drawable?,
         val origActionVisibilities: List<Int>,
-        val origSeamlessVisibility: Int
+        val origSeamlessVisibility: Int,
+        val origSeekBarPadTop: Int,
+        val origSeekBarPadBottom: Int
     ) {
         var ytmActive: Boolean = false
         var lastLeftPanePx: Int = 0
+        var lastHasRealLikeAction: Boolean = false
         var layoutListenerAttached: Boolean = false
         var backdropView: YtmAmbientBackdropView? = null
         var dividerView: View? = null
         var lyricsView: FlowingLyricsView? = null
         var pinToggleView: IslandPinToggleView? = null
+        val origSeamlessTextVisibilities = WeakHashMap<TextView, Int>()
 
         companion object {
             fun capture(views: NativeHolderViews, api: ConstraintApi): PlayerState {
@@ -721,7 +777,9 @@ internal object ExpandedYtmSplitLayout {
                     origTotalSizePx = views.totalTime.textSize,
                     origPlayPauseBackground = views.actions.getOrNull(2)?.background,
                     origActionVisibilities = views.actions.map { it.visibility },
-                    origSeamlessVisibility = views.seamless.visibility
+                    origSeamlessVisibility = views.seamless.visibility,
+                    origSeekBarPadTop = views.seekBar.paddingTop,
+                    origSeekBarPadBottom = views.seekBar.paddingBottom
                 )
             }
         }

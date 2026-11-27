@@ -6,6 +6,7 @@ import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.ByteArrayOutputStream
+import java.util.zip.GZIPOutputStream
 
 class YouTubeProtobufLyricsScannerTest {
 
@@ -76,6 +77,64 @@ class YouTubeProtobufLyricsScannerTest {
         assertFalse(parsed.isSynced)
         assertEquals(5, parsed.lines.size)
         assertEquals("Line three available in airplane mode", parsed.lines[2].text)
+    }
+
+    @Test
+    fun `extracts gzipped offline timed lyrics with YouTube extension fields and proto3 zero start`() {
+        val outer = ByteArrayOutputStream()
+
+        // First cue omits startTimeMs (proto3 default 0) and includes extension field 999
+        val cue0Range = ByteArrayOutputStream().apply {
+            writeVarintField(2, 2_400L)
+            writeBytesField(999, "meta".toByteArray())
+        }.toByteArray()
+        val entry0 = ByteArrayOutputStream().apply {
+            writeBytesField(1, "♪".toByteArray(Charsets.UTF_8))
+            writeBytesField(2, cue0Range)
+            writeBytesField(49399797, "tracking".toByteArray())
+        }.toByteArray()
+        outer.writeBytesField(4, entry0)
+
+        val cues = listOf(
+            Triple("All along I had to talk about it", 2_500L, 6_100L),
+            Triple("But like a two-edged sword", 6_100L, 9_800L),
+            Triple("You sit behind the mask", 9_800L, 14_200L),
+            Triple("And you control your world", 14_200L, 19_000L)
+        )
+        for ((text, startMs, endMs) in cues) {
+            val cueRange = ByteArrayOutputStream().apply {
+                writeVarintField(1, startMs)
+                writeVarintField(2, endMs)
+                writeBytesField(3, "cue-id".toByteArray())
+            }.toByteArray()
+            val entry = ByteArrayOutputStream().apply {
+                writeBytesField(1, text.toByteArray(Charsets.UTF_8))
+                writeBytesField(2, cueRange)
+                writeBytesField(999, "logging".toByteArray())
+            }.toByteArray()
+            outer.writeBytesField(4, entry)
+        }
+
+        val gzipped = ByteArrayOutputStream().apply {
+            GZIPOutputStream(this).use { it.write(outer.toByteArray()) }
+        }.toByteArray()
+
+        val parsed = YouTubeProtobufLyricsScanner.extractFromBlob(
+            blob = gzipped,
+            videoId = "mask1234567",
+            title = "Behind the Mask",
+            artist = "Michael Jackson",
+            durationMs = 302_000L
+        )
+
+        assertNotNull(parsed)
+        parsed!!
+        assertTrue(parsed.isSynced)
+        assertEquals(5, parsed.lines.size)
+        assertEquals(0L, parsed.lines[0].startTimeMs)
+        assertTrue(parsed.lines[0].isInterlude)
+        assertEquals("All along I had to talk about it", parsed.lines[1].text)
+        assertEquals(14_200L, parsed.lines[4].startTimeMs)
     }
 
     private fun ByteArrayOutputStream.writeVarint(value: Long) {

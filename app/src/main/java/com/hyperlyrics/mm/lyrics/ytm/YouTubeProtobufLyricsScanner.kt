@@ -2,21 +2,24 @@ package com.hyperlyrics.mm.lyrics.ytm
 
 import com.hyperlyrics.mm.lyrics.model.LyricLine
 import com.hyperlyrics.mm.lyrics.model.TrackLyrics
+import java.io.ByteArrayInputStream
 import java.nio.charset.StandardCharsets
+import java.util.zip.GZIPInputStream
 
 /**
  * Pure, bounds-checked wire-format Protobuf scanner designed to recover offline lyrics
  * directly from YouTube Music Premium's local SQLite entity/offline protobuf blobs
- * when the device has no internet connection.
+ * (raw or GZIP-compressed) when the device has no internet connection.
  *
  * Extracts:
  *  1. Synced timed lyric entries: submessages holding a valid UTF-8 lyric line alongside
- *     a CueRange submessage with millisecond varints (startTimeMs <= endTimeMs).
+ *     a CueRange submessage with millisecond varints (supports YouTube extension fields
+ *     and proto3 omitted-zero start timestamps).
  *  2. Static multi-line lyric payloads: UTF-8 lyric text blocks inside offline entity blobs.
  */
 object YouTubeProtobufLyricsScanner {
 
-    private const val MAX_DEPTH = 10
+    private const val MAX_DEPTH = 14
     private const val MAX_TRACK_DURATION_MS = 3_600_000L // 60 minutes sanity cap
     private const val WIRE_VARINT = 0
     private const val WIRE_FIXED64 = 1
@@ -32,13 +35,16 @@ object YouTubeProtobufLyricsScanner {
     ): TrackLyrics? {
         if (blob.size < 16 || blob.size > 2 * 1024 * 1024) return null
 
+        val data = maybeGunzip(blob) ?: blob
+        if (data.size < 16 || data.size > 4 * 1024 * 1024) return null
+
         val timedCues = mutableListOf<LyricLine>()
         val staticBlocks = mutableListOf<String>()
 
         scanMessage(
-            data = blob,
+            data = data,
             start = 0,
-            end = blob.size,
+            end = data.size,
             depth = 0,
             timedOut = timedCues,
             staticOut = staticBlocks
@@ -84,6 +90,14 @@ object YouTubeProtobufLyricsScanner {
         }
 
         return null
+    }
+
+    private fun maybeGunzip(blob: ByteArray): ByteArray? {
+        if (blob.size < 18) return null
+        if (blob[0] != 0x1F.toByte() || blob[1] != 0x8B.toByte()) return null
+        return runCatching {
+            GZIPInputStream(ByteArrayInputStream(blob)).use { it.readBytes() }
+        }.getOrNull()
     }
 
     private fun scanMessage(
@@ -154,17 +168,19 @@ object YouTubeProtobufLyricsScanner {
     }
 
     /**
-     * Checks if a small protobuf message represents a YouTube TimedLyrics entry:
+     * Checks if a protobuf message represents a YouTube TimedLyrics entry:
      * contains 1 readable single-line lyric text and a nested CueRange submessage
      * (or direct varint fields) with valid startMs <= endMs millisecond timestamps.
+     * Supports YouTube protobuf extension field numbers (>100) and logging submessages.
      */
     private fun tryParseAsTimedCue(data: ByteArray, start: Int, end: Int): LyricLine? {
         val len = end - start
-        if (len < 6 || len > 512) return null
+        if (len < 6 || len > 2048) return null
 
         var textCandidate: String? = null
         var startMs: Long = -1L
         var endMs: Long = -1L
+        var hasCueRangeSubmessage = false
         var pos = start
 
         while (pos < end) {
@@ -172,13 +188,13 @@ object YouTubeProtobufLyricsScanner {
             pos = tagRes.nextPos
             val wireType = (tagRes.value and 0x7L).toInt()
             val fieldNum = (tagRes.value ushr 3).toInt()
-            if (fieldNum <= 0 || fieldNum > 100) return null
+            if (fieldNum <= 0 || fieldNum > 536_870_911) return null
 
             when (wireType) {
                 WIRE_VARINT -> {
                     val v = readVarint(data, pos, end) ?: return null
                     pos = v.nextPos
-                    if (v.value in 0L..MAX_TRACK_DURATION_MS) {
+                    if (!hasCueRangeSubmessage && v.value in 0L..MAX_TRACK_DURATION_MS) {
                         if (startMs < 0L) startMs = v.value
                         else if (endMs < 0L && v.value >= startMs) endMs = v.value
                     }
@@ -208,6 +224,7 @@ object YouTubeProtobufLyricsScanner {
                     if (cueRange != null) {
                         startMs = cueRange.first
                         endMs = cueRange.second
+                        hasCueRangeSubmessage = true
                     } else if (textCandidate == null && subLen in 1..240) {
                         val decoded = tryDecodeCleanUtf8(data, subStart, subEnd)?.trim()
                         if (decoded != null && looksLikeSingleLyricLine(decoded)) {
@@ -234,24 +251,38 @@ object YouTubeProtobufLyricsScanner {
     }
 
     private fun parseCueRangeSubmessage(data: ByteArray, start: Int, end: Int): Pair<Long, Long>? {
-        if (end - start !in 4..64) return null
+        if (end - start !in 2..256) return null
         var pos = start
+        var field1: Long? = null
+        var field2: Long? = null
         val varints = ArrayList<Long>(4)
-        var fieldCount = 0
 
         while (pos < end) {
             val tagRes = readVarint(data, pos, end) ?: return null
             pos = tagRes.nextPos
             val wireType = (tagRes.value and 0x7L).toInt()
             val fieldNum = (tagRes.value ushr 3).toInt()
-            if (fieldNum <= 0 || fieldNum > 16) return null
-            fieldCount++
+            if (fieldNum <= 0 || fieldNum > 536_870_911) return null
 
             when (wireType) {
                 WIRE_VARINT -> {
                     val v = readVarint(data, pos, end) ?: return null
                     pos = v.nextPos
-                    varints.add(v.value)
+                    if (fieldNum == 1) field1 = v.value
+                    else if (fieldNum == 2) field2 = v.value
+                    if (v.value in 0L..MAX_TRACK_DURATION_MS) {
+                        varints.add(v.value)
+                    }
+                }
+
+                WIRE_FIXED64 -> {
+                    if (pos + 8 > end) return null
+                    pos += 8
+                }
+
+                WIRE_FIXED32 -> {
+                    if (pos + 4 > end) return null
+                    pos += 4
                 }
 
                 WIRE_LEN -> {
@@ -259,7 +290,15 @@ object YouTubeProtobufLyricsScanner {
                     pos = lenRes.nextPos
                     val subLen = lenRes.value.toInt()
                     if (subLen < 0 || pos + subLen > end) return null
-                    // Ignore metadata submessage (e.g. id string)
+                    // Handle string-encoded millisecond timestamps if present, otherwise skip metadata submessage
+                    if (subLen in 1..10 && (fieldNum == 1 || fieldNum == 2)) {
+                        val strNum = tryDecodeCleanUtf8(data, pos, pos + subLen)?.toLongOrNull()
+                        if (strNum != null && strNum in 0L..MAX_TRACK_DURATION_MS) {
+                            if (fieldNum == 1) field1 = strNum
+                            else field2 = strNum
+                            varints.add(strNum)
+                        }
+                    }
                     pos += subLen
                 }
 
@@ -267,9 +306,26 @@ object YouTubeProtobufLyricsScanner {
             }
         }
 
-        if (fieldCount < 2 || varints.size < 2) return null
-        val s = varints[0]
-        val e = varints[1]
+        // Standard CueRange: field 1 = startTimeMs, field 2 = endTimeMs.
+        // In proto3, startTimeMs == 0 is omitted on wire, leaving field 2 = endTimeMs only.
+        val s: Long
+        val e: Long
+        when {
+            field1 != null && field2 != null -> {
+                s = field1
+                e = field2
+            }
+            field1 == null && field2 != null && field2 in 200L..60_000L -> {
+                s = 0L
+                e = field2
+            }
+            varints.size >= 2 -> {
+                s = varints[0]
+                e = varints[1]
+            }
+            else -> return null
+        }
+
         if (s !in 0L..MAX_TRACK_DURATION_MS || e !in s..MAX_TRACK_DURATION_MS) return null
         if (e - s < 150L || e - s > 90_000L) return null
         return s to e
@@ -315,7 +371,6 @@ object YouTubeProtobufLyricsScanner {
     }
 
     private fun tryDecodeCleanUtf8(data: ByteArray, start: Int, end: Int): String? {
-        // Reject raw binary bytes (control characters other than \n, \r, \t)
         for (i in start until end) {
             val b = data[i].toInt() and 0xFF
             if (b < 0x20 && b != 0x0A && b != 0x0D && b != 0x09) return null

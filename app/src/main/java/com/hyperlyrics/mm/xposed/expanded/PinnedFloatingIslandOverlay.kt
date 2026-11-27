@@ -162,8 +162,9 @@ internal object PinnedFloatingIslandOverlay {
             ?: (dm.widthPixels - dp(context, 28f)).coerceAtLeast(dp(context, 310f))
         val cardH = anchorRect?.height()?.takeIf { it in dp(context, 136f)..dp(context, 230f) }
             ?: dp(context, 168f)
-        val topY = anchorRect?.top?.takeIf { it >= 0 && it < dm.heightPixels / 2 }
-            ?: (resolveStatusBarHeight(context) + dp(context, 6f))
+        val minTopY = resolveStatusBarHeight(context) + dp(context, 8f)
+        val topY = anchorRect?.top?.takeIf { it >= minTopY && it < dm.heightPixels / 2 }
+            ?: minTopY
 
         if (isShowing && rootCard != null) {
             applyStateToViews(settings)
@@ -333,24 +334,33 @@ internal object PinnedFloatingIslandOverlay {
         }
         headerRow.addView(textCol, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
 
+        val fadeLen = dp(context, 10f)
         val title = TextView(context).apply {
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.6f)
             typeface = Typeface.create("sans-serif-medium", Typeface.BOLD)
             setTextColor(Color.WHITE)
+            gravity = Gravity.START or Gravity.CENTER_VERTICAL
+            textAlignment = View.TEXT_ALIGNMENT_VIEW_START
             isSingleLine = true
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.MARQUEE
             marqueeRepeatLimit = -1
+            isHorizontalFadingEdgeEnabled = true
+            setFadingEdgeLength(fadeLen)
             isSelected = true
         }
         val artist = TextView(context).apply {
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 10.6f)
             typeface = Typeface.create("sans-serif", Typeface.NORMAL)
             setTextColor(0xB8FFFFFF.toInt())
+            gravity = Gravity.START or Gravity.CENTER_VERTICAL
+            textAlignment = View.TEXT_ALIGNMENT_VIEW_START
             isSingleLine = true
             maxLines = 1
             ellipsize = TextUtils.TruncateAt.MARQUEE
             marqueeRepeatLimit = -1
+            isHorizontalFadingEdgeEnabled = true
+            setFadingEdgeLength(fadeLen)
             isSelected = true
         }
         textCol.addView(title)
@@ -702,7 +712,7 @@ internal object PinnedFloatingIslandOverlay {
 
     private fun formatTime(ms: Long): String {
         val totalSec = (ms / 1000L).coerceAtLeast(0L)
-        return "%d:%02d".format(totalSec / 60L, totalSec % 60L)
+        return "%02d:%02d".format(totalSec / 60L, totalSec % 60L)
     }
 
     private fun dp(context: Context, value: Float): Int =

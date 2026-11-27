@@ -17,6 +17,7 @@ import android.os.SystemClock
 import com.hyperlyrics.mm.common.ModuleConfig
 import com.hyperlyrics.mm.common.ModuleLogger
 import com.hyperlyrics.mm.ipc.LyricsBridgeClient
+import com.hyperlyrics.mm.ipc.LyricsBridgeProvider
 import com.hyperlyrics.mm.lyrics.fallback.LrclibClient
 import com.hyperlyrics.mm.lyrics.fallback.NeteaseLyricsClient
 import com.hyperlyrics.mm.lyrics.fallback.YouTubeCaptionsClient
@@ -26,6 +27,7 @@ import com.hyperlyrics.mm.lyrics.model.TrackLyrics
 import com.hyperlyrics.mm.lyrics.sync.LyricsTimelineEngine
 import com.hyperlyrics.mm.lyrics.ytm.YouTubeMusicInnertubeClient
 import com.hyperlyrics.mm.xposed.RuntimeSettingsHolder
+import kotlinx.serialization.json.Json
 import java.util.LinkedHashMap
 import java.util.concurrent.CopyOnWriteArrayList
 import java.util.concurrent.Executors
@@ -77,6 +79,7 @@ object YouTubeMusicSessionTracker {
     private val directLrclibClient by lazy { LrclibClient() }
     private val directCaptionsClient by lazy { YouTubeCaptionsClient() }
     private val directNeteaseClient by lazy { NeteaseLyricsClient() }
+    private val broadcastJson = Json { ignoreUnknownKeys = true }
 
     private val memoryCache = object : LinkedHashMap<String, TrackLyrics>(32, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, TrackLyrics>?): Boolean =
@@ -297,7 +300,36 @@ object YouTubeMusicSessionTracker {
             ctx.registerReceiver(
                 object : BroadcastReceiver() {
                     override fun onReceive(context: Context?, intent: Intent?) {
-                        val track = currentTrack ?: return
+                        val track = currentTrack
+                        val directJson = intent?.getStringExtra(LyricsBridgeProvider.EXTRA_LYRICS_JSON)
+                        if (!directJson.isNullOrBlank()) {
+                            val decoded = runCatching {
+                                broadcastJson.decodeFromString<TrackLyrics>(directJson)
+                            }.getOrNull()
+                            if (decoded != null && decoded.hasVocalLines) {
+                                val decodedKey = "${decoded.title.lowercase()}|${decoded.artist.lowercase()}"
+                                synchronized(memoryCache) {
+                                    val existing = memoryCache[decodedKey]
+                                    if (existing == null || !existing.isSynced || decoded.isSynced) {
+                                        memoryCache[decodedKey] = decoded
+                                    }
+                                }
+                                if (track != null &&
+                                    (decoded.title.equals(track.title, ignoreCase = true) ||
+                                        (track.videoId != null && track.videoId == decoded.videoId))
+                                ) {
+                                    val curReady = currentLyricsState as? LyricsState.Ready
+                                    if (curReady == null || !curReady.lyrics.isSynced || decoded.isSynced) {
+                                        val ready = LyricsState.Ready(decoded)
+                                        currentLyricsState = ready
+                                        notifyLyricsChanged(ready)
+                                        return
+                                    }
+                                }
+                            }
+                        }
+
+                        if (track == null) return
                         // Clear in-memory entry and reload fresh pinned/offline/speech lyrics
                         val cacheKey = "${track.title.lowercase()}|${track.artist.lowercase()}"
                         synchronized(memoryCache) { memoryCache.remove(cacheKey) }
