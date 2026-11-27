@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Dynamic Island capsule outline -->
+    <path
+        android:fillColor="#1A1A1F"
+        android:strokeColor="#FF0033"
+        android:strokeWidth="2.5"
+        android:pathData="M24,36 L84,36 A18,18 0 0,1 84,72 L24,72 A18,18 0 0,1 24,36 Z" />
+    <!-- Play circle (YouTube Music accent) -->
+    <path
+        android:fillColor="#FF0033"
+        android:pathData="M37,43 A11,11 0 1,1 36.99,43 Z" />
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M34.5,48.5 L34.5,59.5 L43,54 Z" />
+    <!-- Flowing synced lyric lines on right -->
+    <path
+        android:fillColor="#66FFFFFF"
+        android:pathData="M54,45 L73,45 A1.5,1.5 0 0,1 73,48 L54,48 A1.5,1.5 0 0,1 54,45 Z" />
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M54,52 L82,52 A2,2 0 0,1 82,56 L54,56 A2,2 0 0,1 54,52 Z" />
+    <path
+        android:fillColor="#66FFFFFF"
+        android:pathData="M54,60 L76,60 A1.5,1.5 0 0,1 76,63 L54,63 A1.5,1.5 0 0,1 54,60 Z" />
+</vector>

@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">HyperLyricsMM</string>
+    <string name="module_description">HyperOS Süper Ada üzerinde YouTube Music için yerel senkronize şarkı sözleri (kompakt genişletilmiş oynatıcı + isteğe bağlı tek satır minimal ada).</string>
+</resources>
