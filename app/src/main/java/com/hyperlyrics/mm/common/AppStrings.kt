@@ -130,7 +130,14 @@ data class AppStrings(
     val setupTitle: String,
     val setupBody: String,
 
-    // Feedback, Diagnostics & About
+    // Supported Music Apps
+    val sectionMusicApps: String,
+    val musicAppsSubtitle: String,
+    val appLocalPlayersLabel: String,
+    val appAllMediaTitle: String,
+    val appAllMediaSubtitle: String,
+
+    // Feedback, Diagnostics, Credits & About
     val sectionPreferences: String,
     val sectionFeedback: String,
     val feedbackTitle: String,
@@ -155,8 +162,11 @@ data class AppStrings(
     val logsEmptyMsg: String,
     val clearLogsBtn: String,
     val closeBtn: String,
+    val sectionCredits: String,
+    val creditsBody: String,
     val sectionAbout: String,
     val aboutDeveloperLabel: String,
+    val aboutLicenseLabel: String,
     val aboutGithubBtn: String
 )
 
@@ -187,7 +197,7 @@ object AppStringsProvider {
         tabFeedback = "Support",
 
         masterTitle = "Enable HyperLyricsMM",
-        masterSubtitle = "Enhances Hyper Island exclusively while YouTube Music is active",
+        masterSubtitle = "Upgrades Hyper Island with live lyrics for YouTube Music, Spotify, Deezer & more",
         languageTitle = "App Language",
         langSystem = "System",
         langEnglish = "English",
@@ -286,9 +296,15 @@ object AppStringsProvider {
         clearBtn = "Clear",
 
         setupTitle = "LSPosed Setup Guide",
-        setupBody = "1. Enable HyperLyricsMM in LSPosed Manager (LibXposed API 101+).\n" +
-            "2. Check 'System UI' (com.android.systemui) and 'YouTube Music' in scope.\n" +
+        setupBody = "1. Enable HyperLyricsMM in LSPosed / Vector Manager (LibXposed API 101+).\n" +
+            "2. Check 'System UI' (com.android.systemui) — required for all music apps (Spotify, Deezer, Apple Music, etc.) — and optionally 'YouTube Music' for offline Premium pre-caching.\n" +
             "3. Restart SystemUI or reboot. Setting updates apply live.",
+
+        sectionMusicApps = "SUPPORTED MUSIC APPS",
+        musicAppsSubtitle = "YouTube Music is always enabled. Spotify, Deezer, Apple Music & more work directly via System UI without extra LSPosed scope.",
+        appLocalPlayersLabel = "Local Players",
+        appAllMediaTitle = "All Other Audio Apps",
+        appAllMediaSubtitle = "Enable Hyper Island lyrics for any other music/audio player (video & social apps are automatically excluded)",
 
         sectionPreferences = "PREFERENCES",
         sectionFeedback = "FEEDBACK & CONTACT",
@@ -314,8 +330,16 @@ object AppStringsProvider {
         logsEmptyMsg = "No logs recorded in this session yet.",
         clearLogsBtn = "Clear",
         closeBtn = "Close",
-        sectionAbout = "ABOUT",
+        sectionCredits = "ACKNOWLEDGEMENTS & INSPIRATION",
+        creditsBody = "Built with deep thanks to the open-source Android & Xposed community:\n" +
+            "• LSPosed & LibXposed — Modern Xposed API 101+ & Xposed-Modules-Repo\n" +
+            "• Vector (JingMatrix/Vector) — High-performance modern ART hooking framework\n" +
+            "• HyperOS Island & Lyric Community (HyperCeiler, HyperIsland, LyricGetter / SuperLyric) — Super Island & live lyrics research\n" +
+            "• OuterTune, InnerTune, Metrolist & SimpMusic — Flowing YouTube Music lyrics UX inspiration\n" +
+            "• LRCLIB (tranxuanthang/lrclib) — Open community synchronized LRC database",
+        sectionAbout = "ABOUT & LICENSE",
         aboutDeveloperLabel = "Contact: mehmeteymensevik@gmail.com",
+        aboutLicenseLabel = "License: GNU General Public License v3.0 (GPL-3.0)",
         aboutGithubBtn = "GitHub Repo"
     )
 
@@ -336,7 +360,7 @@ object AppStringsProvider {
         tabFeedback = "Destek",
 
         masterTitle = "HyperLyricsMM Modülü Aktif",
-        masterSubtitle = "Yalnızca YouTube Music oynatılırken Hyper Ada düzenini geliştirir",
+        masterSubtitle = "YouTube Music, Spotify, Deezer ve desteklenen müzik uygulamalarında Hyper Ada'ya canlı söz ekler",
         languageTitle = "Uygulama Dili / Language",
         langSystem = "Sistem",
         langEnglish = "English",
@@ -435,9 +459,15 @@ object AppStringsProvider {
         clearBtn = "Temizle",
 
         setupTitle = "LSPosed Kurulum Adımları",
-        setupBody = "1. LSPosed Manager'da HyperLyricsMM modülünü etkinleştirin (API 101+).\n" +
-            "2. Kapsam (Scope) olarak 'Sistem Arayüzü' (com.android.systemui) ve 'YouTube Music' seçin.\n" +
+        setupBody = "1. LSPosed / Vector Manager'da HyperLyricsMM modülünü etkinleştirin (API 101+).\n" +
+            "2. Kapsam (Scope) olarak 'Sistem Arayüzü' (com.android.systemui) seçin (Spotify, Deezer, Apple Music vb. için yeterlidir); YouTube Music Premium çevrimdışı desteği için 'YouTube Music' de ekleyin.\n" +
             "3. Sistem Arayüzünü veya cihazı yeniden başlatın. Ayarlar anlık uygulanır.",
+
+        sectionMusicApps = "DESTEKLENEN MÜZİK UYGULAMALARI",
+        musicAppsSubtitle = "YouTube Music her zaman aktiftir. Spotify, Deezer, Apple Music ve diğerleri ek LSPosed kapsamı gerekmeden doğrudan Sistem Arayüzü üzerinden çalışır.",
+        appLocalPlayersLabel = "Yerel Oynatıcılar",
+        appAllMediaTitle = "Diğer Tüm Ses Uygulamaları",
+        appAllMediaSubtitle = "Listede olmayan diğer müzik/ses oynatıcılarında da etkinleştirir (YouTube, TikTok, Instagram, Netflix gibi video uygulamaları hariç tutulur)",
 
         sectionPreferences = "TERCİHLER",
         sectionFeedback = "GERİ BİLDİRİM & İLETİŞİM",
@@ -463,8 +493,16 @@ object AppStringsProvider {
         logsEmptyMsg = "Bu oturumda henüz kayıtlı log yok.",
         clearLogsBtn = "Temizle",
         closeBtn = "Kapat",
-        sectionAbout = "HAKKINDA",
+        sectionCredits = "TEŞEKKÜRLER & ESİNLENİLEN PROJELER",
+        creditsBody = "Açık kaynak Android & Xposed topluluğundaki ilham verici projelere teşekkürler:\n" +
+            "• LSPosed & LibXposed — Modern Xposed API 101+ ve Xposed-Modules-Repo\n" +
+            "• Vector (JingMatrix/Vector) — Modern yüksek performanslı ART kanca çatısı\n" +
+            "• HyperOS Ada & Şarkı Sözü Topluluğu (HyperCeiler, HyperIsland, LyricGetter / SuperLyric) — Süper Ada ve canlı söz araştırmaları\n" +
+            "• OuterTune, InnerTune, Metrolist & SimpMusic — Akıcı YouTube Music söz arayüzü ve Innertube ilhamı\n" +
+            "• LRCLIB (tranxuanthang/lrclib) — Ücretsiz açık kaynak senkronize LRC veritabanı",
+        sectionAbout = "HAKKINDA & LİSANS",
         aboutDeveloperLabel = "İletişim: mehmeteymensevik@gmail.com",
+        aboutLicenseLabel = "Lisans: GNU General Public License v3.0 (GPL-3.0)",
         aboutGithubBtn = "GitHub Deposu"
     )
 }

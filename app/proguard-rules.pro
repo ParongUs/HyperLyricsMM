@@ -18,5 +18,6 @@
 -keep class com.hyperlyrics.mm.xposed.expanded.YtmAmbientBackdropView { *; }
 -keep class com.hyperlyrics.mm.xposed.expanded.IslandPinToggleView { *; }
 -keep class com.hyperlyrics.mm.xposed.expanded.ExpandedIslandPinController { *; }
+-keep class com.hyperlyrics.mm.xposed.expanded.PinnedFloatingIslandOverlay { *; }
 -keep class com.hyperlyrics.mm.xposed.minimal.MinimalSingleLineLyricView { *; }
 -keep class com.hyperlyrics.mm.lyrics.local.LocalSpeechLyricsService { *; }

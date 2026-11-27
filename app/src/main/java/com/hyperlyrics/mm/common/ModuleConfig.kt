@@ -83,6 +83,16 @@ data class ModuleSettings(
     val localLrcTreeUri: String = "",
     val localSpeechExtractorEnabled: Boolean = false,
 
+    // Supported Music Apps (YouTube Music always active; other players toggleable)
+    val supportSpotify: Boolean = true,
+    val supportDeezer: Boolean = true,
+    val supportAppleMusic: Boolean = true,
+    val supportTidal: Boolean = true,
+    val supportSoundCloud: Boolean = true,
+    val supportAmazonMusic: Boolean = true,
+    val supportLocalPlayers: Boolean = true,
+    val supportAllMediaApps: Boolean = false,
+
     // Sync
     val syncOffsetMs: Int = 0 // -1500..+1500
 ) {
@@ -137,6 +147,15 @@ object ModuleConfig {
     const val KEY_LOCAL_LRC_TREE_URI = "local_lrc_tree_uri"
     const val KEY_LOCAL_SPEECH_EXTRACTOR_ENABLED = "local_speech_extractor_enabled"
 
+    const val KEY_SUPPORT_SPOTIFY = "support_spotify"
+    const val KEY_SUPPORT_DEEZER = "support_deezer"
+    const val KEY_SUPPORT_APPLE_MUSIC = "support_apple_music"
+    const val KEY_SUPPORT_TIDAL = "support_tidal"
+    const val KEY_SUPPORT_SOUNDCLOUD = "support_soundcloud"
+    const val KEY_SUPPORT_AMAZON_MUSIC = "support_amazon_music"
+    const val KEY_SUPPORT_LOCAL_PLAYERS = "support_local_players"
+    const val KEY_SUPPORT_ALL_MEDIA_APPS = "support_all_media_apps"
+
     const val KEY_SYNC_OFFSET_MS = "sync_offset_ms"
 
     // YouTube Music Brand Palette
@@ -145,12 +164,96 @@ object ModuleConfig {
     const val YTM_CRIMSON = 0xFFFF0033.toInt()
     const val YTM_CRIMSON_SOFT = 0xFFFF3D5E.toInt()
 
+    private val SPOTIFY_PACKAGES = setOf(
+        "com.spotify.music",
+        "com.spotify.lite"
+    )
+    private val DEEZER_PACKAGES = setOf(
+        "deezer.android.app"
+    )
+    private val APPLE_MUSIC_PACKAGES = setOf(
+        "com.apple.android.music"
+    )
+    private val TIDAL_PACKAGES = setOf(
+        "com.aspiro.tidal"
+    )
+    private val SOUNDCLOUD_PACKAGES = setOf(
+        "com.soundcloud.android"
+    )
+    private val AMAZON_MUSIC_PACKAGES = setOf(
+        "com.amazon.mp3"
+    )
+    private val LOCAL_AND_OTHER_MUSIC_PACKAGES = setOf(
+        "com.miui.player",
+        "com.sec.android.app.music",
+        "com.maxmpz.audioplayer",
+        "in.krosbits.musicolet",
+        "com.piyush.music",
+        "app.symfonik.music.player",
+        "code.name.monkey.retromusic",
+        "io.github.muntashirakon.Music",
+        "com.moriafly.salt.music",
+        "com.qobuz.music",
+        "ru.yandex.music",
+        "com.vkontakte.android",
+        "com.uma.musicvk",
+        "com.netease.cloudmusic",
+        "com.tencent.qqmusic",
+        "com.kugou.android",
+        "com.foobar2000.foobar2000",
+        "org.videolan.vlc",
+        "com.dd3boh.outertune",
+        "com.zionhuang.music",
+        "com.malopieds.innertune",
+        "com.mostafa.metrolist",
+        "com.maxrave.simpmusic",
+        "com.frolo.musp",
+        "com.blackplayer.musicplayer",
+        "com.kodarkooperativet.blackplayerex",
+        "com.pandora.android",
+        "com.anghami",
+        "com.jio.media.jiobeats",
+        "com.turkcell.gncplay",
+        "com.muud"
+    )
+    private val EXCLUDED_VIDEO_OR_SOCIAL_PACKAGES = setOf(
+        "com.google.android.youtube",
+        "com.zhiliaoapp.musically",
+        "com.ss.android.ugc.trill",
+        "com.ss.android.ugc.aweme",
+        "com.instagram.android",
+        "com.netflix.mediaclient",
+        "com.android.chrome",
+        "org.mozilla.firefox",
+        "com.microsoft.emmx",
+        "tv.twitch.android.app",
+        "com.disney.disneyplus",
+        "com.amazon.avod.thirdpartyclient",
+        "com.twitter.android",
+        "org.telegram.messenger",
+        "com.whatsapp"
+    )
+
     fun isYouTubeMusicPackage(packageName: String?): Boolean {
         if (packageName.isNullOrBlank()) return false
         return packageName == YT_MUSIC_PACKAGE ||
             packageName == "app.rvx.android.apps.youtube.music" ||
             packageName == "app.revanced.android.apps.youtube.music" ||
             packageName.endsWith(".youtube.music")
+    }
+
+    fun isTargetMusicPackage(packageName: String?, settings: ModuleSettings): Boolean {
+        if (packageName.isNullOrBlank()) return false
+        if (isYouTubeMusicPackage(packageName)) return true
+        if (settings.supportSpotify && packageName in SPOTIFY_PACKAGES) return true
+        if (settings.supportDeezer && packageName in DEEZER_PACKAGES) return true
+        if (settings.supportAppleMusic && packageName in APPLE_MUSIC_PACKAGES) return true
+        if (settings.supportTidal && packageName in TIDAL_PACKAGES) return true
+        if (settings.supportSoundCloud && packageName in SOUNDCLOUD_PACKAGES) return true
+        if (settings.supportAmazonMusic && packageName in AMAZON_MUSIC_PACKAGES) return true
+        if (settings.supportLocalPlayers && packageName in LOCAL_AND_OTHER_MUSIC_PACKAGES) return true
+        if (settings.supportAllMediaApps && packageName !in EXCLUDED_VIDEO_OR_SOCIAL_PACKAGES) return true
+        return false
     }
 
     fun readSettings(prefs: SharedPreferences?): ModuleSettings {
@@ -188,6 +291,14 @@ object ModuleConfig {
             localLrcFolderEnabled = prefs.getBoolean(KEY_LOCAL_LRC_FOLDER_ENABLED, false),
             localLrcTreeUri = prefs.getString(KEY_LOCAL_LRC_TREE_URI, "").orEmpty(),
             localSpeechExtractorEnabled = prefs.getBoolean(KEY_LOCAL_SPEECH_EXTRACTOR_ENABLED, false),
+            supportSpotify = prefs.getBoolean(KEY_SUPPORT_SPOTIFY, true),
+            supportDeezer = prefs.getBoolean(KEY_SUPPORT_DEEZER, true),
+            supportAppleMusic = prefs.getBoolean(KEY_SUPPORT_APPLE_MUSIC, true),
+            supportTidal = prefs.getBoolean(KEY_SUPPORT_TIDAL, true),
+            supportSoundCloud = prefs.getBoolean(KEY_SUPPORT_SOUNDCLOUD, true),
+            supportAmazonMusic = prefs.getBoolean(KEY_SUPPORT_AMAZON_MUSIC, true),
+            supportLocalPlayers = prefs.getBoolean(KEY_SUPPORT_LOCAL_PLAYERS, true),
+            supportAllMediaApps = prefs.getBoolean(KEY_SUPPORT_ALL_MEDIA_APPS, false),
             syncOffsetMs = prefs.getInt(KEY_SYNC_OFFSET_MS, 0).coerceIn(-1500, 1500)
         )
     }
@@ -219,6 +330,14 @@ object ModuleConfig {
         editor.putBoolean(KEY_LOCAL_LRC_FOLDER_ENABLED, settings.localLrcFolderEnabled)
         editor.putString(KEY_LOCAL_LRC_TREE_URI, settings.localLrcTreeUri)
         editor.putBoolean(KEY_LOCAL_SPEECH_EXTRACTOR_ENABLED, settings.localSpeechExtractorEnabled)
+        editor.putBoolean(KEY_SUPPORT_SPOTIFY, settings.supportSpotify)
+        editor.putBoolean(KEY_SUPPORT_DEEZER, settings.supportDeezer)
+        editor.putBoolean(KEY_SUPPORT_APPLE_MUSIC, settings.supportAppleMusic)
+        editor.putBoolean(KEY_SUPPORT_TIDAL, settings.supportTidal)
+        editor.putBoolean(KEY_SUPPORT_SOUNDCLOUD, settings.supportSoundCloud)
+        editor.putBoolean(KEY_SUPPORT_AMAZON_MUSIC, settings.supportAmazonMusic)
+        editor.putBoolean(KEY_SUPPORT_LOCAL_PLAYERS, settings.supportLocalPlayers)
+        editor.putBoolean(KEY_SUPPORT_ALL_MEDIA_APPS, settings.supportAllMediaApps)
         editor.putInt(KEY_SYNC_OFFSET_MS, settings.syncOffsetMs)
     }
 }

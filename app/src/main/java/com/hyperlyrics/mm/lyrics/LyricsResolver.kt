@@ -3,6 +3,7 @@ package com.hyperlyrics.mm.lyrics
 import android.content.Context
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import com.hyperlyrics.mm.common.ModuleConfig
 import com.hyperlyrics.mm.common.ModuleLogger
 import com.hyperlyrics.mm.common.ModuleSettings
 import com.hyperlyrics.mm.lyrics.cache.LyricsCacheDatabase
@@ -36,7 +37,8 @@ class LyricsResolver(
         durationMs: Long = 0L,
         settings: ModuleSettings,
         forceRefresh: Boolean = false,
-        pinIfFound: Boolean = false
+        pinIfFound: Boolean = false,
+        sourcePackage: String? = null
     ): TrackLyrics? {
         if (!forceRefresh) {
             val cached = cacheDb.get(videoId, title, artist)
@@ -68,6 +70,22 @@ class LyricsResolver(
             return null
         }
 
+        val isNonYtmApp = !sourcePackage.isNullOrBlank() && !ModuleConfig.isYouTubeMusicPackage(sourcePackage)
+        var staticBackup: TrackLyrics? = null
+
+        // For Spotify, Deezer, Apple Music, Tidal, local players, etc., LRCLIB matches album track
+        // durations with millisecond accuracy — try synced LRCLIB first before falling back to YTM search.
+        if (isNonYtmApp && settings.fallbackLrclibEnabled) {
+            val lrc = lrclibClient.fetchLyrics(title, artist, album, durationMs, null)
+            if (lrc != null && lrc.hasVocalLines) {
+                if (lrc.isSynced) {
+                    cacheDb.put(lrc, pinned = pinIfFound)
+                    return lrc
+                }
+                staticBackup = lrc
+            }
+        }
+
         var resolvedId = videoId?.takeIf { YouTubeMusicInnertubeClient.isValidVideoId(it) }
         var nativeResult: TrackLyrics? = null
         if (resolvedId != null) {
@@ -82,11 +100,11 @@ class LyricsResolver(
             return nativeResult
         }
 
-        if (!settings.externalFallbackEnabled) return null
+        if (!settings.externalFallbackEnabled && !isNonYtmApp) {
+            return staticBackup?.also { cacheDb.put(it, pinned = pinIfFound) }
+        }
 
-        var staticBackup: TrackLyrics? = null
-
-        if (settings.fallbackLrclibEnabled) {
+        if (!isNonYtmApp && settings.fallbackLrclibEnabled) {
             val lrc = lrclibClient.fetchLyrics(title, artist, album, durationMs, resolvedId)
             if (lrc != null && lrc.hasVocalLines) {
                 if (lrc.isSynced) {

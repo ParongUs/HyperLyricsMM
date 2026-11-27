@@ -215,7 +215,7 @@ object ExpandedIslandCoordinator {
         snapshot.forEach { binder ->
             runCatching {
                 val pkg = api.getPackageName(binder, null)
-                if (!ModuleConfig.isYouTubeMusicPackage(pkg)) return@forEach
+                if (!ModuleConfig.isTargetMusicPackage(pkg, settings)) return@forEach
                 val palette = binderPalettes[binder] ?: YtmCardPalette.DEFAULT_DYNAMIC
                 api.getHolders(binder).forEach { holder ->
                     val player = api.getPlayer(holder) ?: return@forEach
@@ -240,7 +240,7 @@ object ExpandedIslandCoordinator {
         snapshot.forEach { binder ->
             runCatching {
                 val pkg = api.getPackageName(binder, null)
-                if (!ModuleConfig.isYouTubeMusicPackage(pkg)) return@forEach
+                if (!ModuleConfig.isTargetMusicPackage(pkg, settings)) return@forEach
                 val palette = binderPalettes[binder] ?: YtmCardPalette.DEFAULT_DYNAMIC
                 api.getHolders(binder).forEach { holder ->
                     val player = api.getPlayer(holder) ?: return@forEach
@@ -264,8 +264,8 @@ object ExpandedIslandCoordinator {
         val api = nativeApi ?: return
         val settings = RuntimeSettingsHolder.current
         val pkg = api.getPackageName(binder, explicitMediaData)
-        val isYtm = ModuleConfig.isYouTubeMusicPackage(pkg)
-        val shouldActivate = settings.masterEnabled && settings.expandedLyricsEnabled && isYtm
+        val isSupportedMusic = ModuleConfig.isTargetMusicPackage(pkg, settings)
+        val shouldActivate = settings.masterEnabled && settings.expandedLyricsEnabled && isSupportedMusic
 
         val holders = api.getHolders(binder)
         if (holders.isEmpty()) return
@@ -275,7 +275,7 @@ object ExpandedIslandCoordinator {
                 api.extractHolderViews(holder)?.let { views ->
                     ExpandedIslandPinController.reconcilePlayer(
                         player = views.player,
-                        isYtmActive = false,
+                        isMediaActive = false,
                         settings = settings
                     )
                     ExpandedYtmSplitLayout.restoreNativeLayout(views) { seekBar ->
@@ -292,6 +292,7 @@ object ExpandedIslandCoordinator {
         }
 
         val isPlaying = api.isPlaying(binder, explicitMediaData) || YouTubeMusicSessionTracker.isPlaying
+        val artwork = api.getArtworkDrawable(binder, holders.firstOrNull())
 
         // Guarantee session tracker is bound even if Application.onCreate ran before hooking
         val firstPlayer = holders.firstNotNullOfOrNull { api.getPlayer(it) }
@@ -333,17 +334,16 @@ object ExpandedIslandCoordinator {
                 )
                 ExpandedIslandPinController.reconcilePlayer(
                     player = views.player,
-                    isYtmActive = true,
-                    settings = settings
+                    isMediaActive = true,
+                    settings = settings,
+                    palette = currentPalette,
+                    artworkDrawable = artwork
                 )
             }
         }
 
-        if (refreshPalette) {
-            val artwork = api.getArtworkDrawable(binder, holders.firstOrNull())
-            if (artwork != null) {
-                extractPaletteAsync(binder, artwork, settings)
-            }
+        if (refreshPalette && artwork != null) {
+            extractPaletteAsync(binder, artwork, settings)
         }
     }
 
@@ -356,6 +356,7 @@ object ExpandedIslandCoordinator {
             )
             binderPalettes[binder] = palette
             mainHandler.post {
+                ExpandedIslandPinController.updateVisuals(palette, artwork, RuntimeSettingsHolder.current)
                 if (activeBinders.contains(binder)) {
                     runCatching { applyOrRestoreBinder(binder, explicitMediaData = null, refreshPalette = false) }
                 }
@@ -371,7 +372,7 @@ object ExpandedIslandCoordinator {
         val api = nativeApi ?: return false
         val binders = synchronized(activeBinders) { activeBinders.toList() }
         for (binder in binders) {
-            if (!ModuleConfig.isYouTubeMusicPackage(api.getPackageName(binder, null))) continue
+            if (!ModuleConfig.isTargetMusicPackage(api.getPackageName(binder, null), settings)) continue
             if (api.getHolders(binder).any { api.getMediaBgView(it) === musicBgView }) {
                 return true
             }

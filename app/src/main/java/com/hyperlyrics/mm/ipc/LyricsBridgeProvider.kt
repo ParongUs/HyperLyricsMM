@@ -190,17 +190,27 @@ class LyricsBridgeProvider : ContentProvider() {
         val title = extras.getString(EXTRA_TITLE).orEmpty().trim()
         val artist = extras.getString(EXTRA_ARTIST).orEmpty().trim()
         val album = extras.getString(EXTRA_ALBUM).orEmpty().trim()
+        val sourcePackage = extras.getString(EXTRA_SOURCE_PACKAGE)?.trim()
         val durationMs = extras.getLong(EXTRA_DURATION_MS, 0L)
         val forceRefresh = extras.getBoolean(EXTRA_FORCE_REFRESH, false)
 
+        val isYtmSource = sourcePackage.isNullOrBlank() || ModuleConfig.isYouTubeMusicPackage(sourcePackage)
         val explicitVideoId = extras.getString(EXTRA_VIDEO_ID)?.trim()
-            ?.takeIf { YouTubeMusicInnertubeClient.isValidVideoId(it) }
+            ?.takeIf { isYtmSource && YouTubeMusicInnertubeClient.isValidVideoId(it) }
         val trackKey = LyricsCacheDatabase.makeTrackKey(title, artist)
-        val mappedVideoId = trackKey.takeIf { it.isNotEmpty() }?.let { videoIdByTrackKey[it] }
-        val recentVideoId = lastReportedVideoId?.takeIf { recent ->
-            System.currentTimeMillis() - recent.timestampMs < 25_000L &&
-                (recent.title.isBlank() || recent.title.equals(title, ignoreCase = true))
-        }?.videoId
+        val mappedVideoId = if (isYtmSource) {
+            trackKey.takeIf { it.isNotEmpty() }?.let { videoIdByTrackKey[it] }
+        } else {
+            null
+        }
+        val recentVideoId = if (isYtmSource) {
+            lastReportedVideoId?.takeIf { recent ->
+                System.currentTimeMillis() - recent.timestampMs < 25_000L &&
+                    (recent.title.isBlank() || recent.title.equals(title, ignoreCase = true))
+            }?.videoId
+        } else {
+            null
+        }
 
         val resolvedVideoId = explicitVideoId ?: mappedVideoId ?: recentVideoId
         val settings = readCurrentSettings(ctx)
@@ -213,7 +223,8 @@ class LyricsBridgeProvider : ContentProvider() {
             durationMs = durationMs,
             settings = settings,
             forceRefresh = forceRefresh,
-            pinIfFound = false
+            pinIfFound = false,
+            sourcePackage = sourcePackage
         )
 
         if (fetched != null && fetched.hasVocalLines) {
@@ -256,6 +267,14 @@ class LyricsBridgeProvider : ContentProvider() {
             putBoolean(ModuleConfig.KEY_LOCAL_LRC_FOLDER_ENABLED, s.localLrcFolderEnabled)
             putString(ModuleConfig.KEY_LOCAL_LRC_TREE_URI, s.localLrcTreeUri)
             putBoolean(ModuleConfig.KEY_LOCAL_SPEECH_EXTRACTOR_ENABLED, s.localSpeechExtractorEnabled)
+            putBoolean(ModuleConfig.KEY_SUPPORT_SPOTIFY, s.supportSpotify)
+            putBoolean(ModuleConfig.KEY_SUPPORT_DEEZER, s.supportDeezer)
+            putBoolean(ModuleConfig.KEY_SUPPORT_APPLE_MUSIC, s.supportAppleMusic)
+            putBoolean(ModuleConfig.KEY_SUPPORT_TIDAL, s.supportTidal)
+            putBoolean(ModuleConfig.KEY_SUPPORT_SOUNDCLOUD, s.supportSoundCloud)
+            putBoolean(ModuleConfig.KEY_SUPPORT_AMAZON_MUSIC, s.supportAmazonMusic)
+            putBoolean(ModuleConfig.KEY_SUPPORT_LOCAL_PLAYERS, s.supportLocalPlayers)
+            putBoolean(ModuleConfig.KEY_SUPPORT_ALL_MEDIA_APPS, s.supportAllMediaApps)
             putInt(ModuleConfig.KEY_SYNC_OFFSET_MS, s.syncOffsetMs)
         }
     }
@@ -313,6 +332,7 @@ class LyricsBridgeProvider : ContentProvider() {
         const val EXTRA_ARTIST = "artist"
         const val EXTRA_ARTISTS = "artists"
         const val EXTRA_ALBUM = "album"
+        const val EXTRA_SOURCE_PACKAGE = "source_package"
         const val EXTRA_DURATION_MS = "duration_ms"
         const val EXTRA_FORCE_REFRESH = "force_refresh"
         const val EXTRA_RAW_JSON = "raw_json"

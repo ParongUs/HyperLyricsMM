@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">HyperLyricsMM</string>
-    <string name="module_description">Native YouTube Music live lyrics inside HyperOS Super Island (compact split expanded player + optional single-line minimal pill).</string>
+    <string name="module_description">Live synchronized lyrics on Xiaomi HyperOS Super Island for YouTube Music, Spotify, Deezer, Apple Music &amp; more (split expanded player with pin mode + optional minimal pill).</string>
 </resources>

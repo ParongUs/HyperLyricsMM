@@ -152,7 +152,7 @@ object MinimalIslandCoordinator {
                             settings.masterEnabled &&
                             settings.minimalLyricsEnabled &&
                             settings.unlockIslandWidthLimit &&
-                            isYouTubeMusicIsland(extractCurrentIslandData(view)) &&
+                            isSupportedMusicIsland(extractCurrentIslandData(view), settings) &&
                             view.findViewWithTag<View>(TAG_MINIMAL_LYRIC)?.visibility == View.VISIBLE
                         ) {
                             val screenW = Resources.getSystem().displayMetrics.widthPixels.toFloat()
@@ -247,7 +247,7 @@ object MinimalIslandCoordinator {
 
     private fun reconcileHost(host: ViewGroup, islandData: Any?, triggerRelayout: Boolean) {
         val settings = RuntimeSettingsHolder.current
-        val isYtm = isYouTubeMusicIsland(islandData)
+        val isSupported = isSupportedMusicIsland(islandData, settings)
         val snapshot = YouTubeMusicSessionTracker.currentActiveLyric()
         val activeLineText = snapshot.currentText.ifBlank {
             if (snapshot.isInterlude) "♪" else ""
@@ -255,7 +255,7 @@ object MinimalIslandCoordinator {
 
         val showMinimal = settings.masterEnabled &&
             settings.minimalLyricsEnabled &&
-            isYtm &&
+            isSupported &&
             YouTubeMusicSessionTracker.isPlaying &&
             activeLineText.isNotEmpty()
 
@@ -361,14 +361,14 @@ object MinimalIslandCoordinator {
         }
     }
 
-    private fun isYouTubeMusicIsland(data: Any?): Boolean {
+    private fun isSupportedMusicIsland(data: Any?, settings: ModuleSettings): Boolean {
         if (data == null) return false
         val extras = runCatching {
             data.javaClass.methods.firstOrNull { it.name == "getExtras" && it.parameterCount == 0 }
                 ?.invoke(data) as? Bundle
         }.getOrNull() ?: return false
         val pkg = extras.getString("miui.pkg.name")
-        return ModuleConfig.isYouTubeMusicPackage(pkg)
+        return ModuleConfig.isTargetMusicPackage(pkg, settings)
     }
 
     private fun extractCurrentIslandData(view: View): Any? {

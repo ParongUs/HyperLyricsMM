@@ -26,6 +26,7 @@ import androidx.compose.material.icons.rounded.BugReport
 import androidx.compose.material.icons.rounded.Code
 import androidx.compose.material.icons.rounded.ContentCopy
 import androidx.compose.material.icons.rounded.Email
+import androidx.compose.material.icons.rounded.Favorite
 import androidx.compose.material.icons.rounded.Info
 import androidx.compose.material.icons.rounded.Terminal
 import androidx.compose.material3.AlertDialog
@@ -417,14 +418,38 @@ fun FeedbackTab(
             }
         }
 
-        // Section 5: About Card
+        // Section 5: Acknowledgements & Inspired Projects
+        SectionHeader(strings.sectionCredits)
+        SettingsGroupCard {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(14.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Icon(
+                    imageVector = Icons.Rounded.Favorite,
+                    contentDescription = null,
+                    tint = YtmColors.CrimsonSoft,
+                    modifier = Modifier.size(18.dp)
+                )
+                Text(
+                    text = strings.creditsBody,
+                    color = YtmColors.TextSecondary,
+                    fontSize = 11.5.sp,
+                    lineHeight = 17.sp
+                )
+            }
+        }
+
+        // Section 6: About & License Card
         SectionHeader(strings.sectionAbout)
         SettingsGroupCard {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(14.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
                     text = "HyperLyricsMM v${BuildConfig.VERSION_NAME}",
@@ -436,6 +461,11 @@ fun FeedbackTab(
                     text = strings.aboutDeveloperLabel,
                     color = YtmColors.TextSecondary,
                     fontSize = 12.sp
+                )
+                Text(
+                    text = strings.aboutLicenseLabel,
+                    color = YtmColors.TextMuted,
+                    fontSize = 11.5.sp
                 )
                 OutlinedButton(
                     onClick = { openExternalUrl(ModuleConfig.GITHUB_REPO_URL) },

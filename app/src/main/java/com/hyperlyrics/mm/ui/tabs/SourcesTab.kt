@@ -1,6 +1,7 @@
 package com.hyperlyrics.mm.ui.tabs
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -15,6 +16,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.NoteAdd
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.DeleteOutline
 import androidx.compose.material.icons.rounded.FolderOpen
 import androidx.compose.material.icons.rounded.Mic
@@ -68,6 +70,58 @@ fun SourcesTab(
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
+        // Section 0: Supported Music Apps (Spotify, Deezer, Apple Music, Tidal, SoundCloud, Amazon, Local)
+        SectionHeader(strings.sectionMusicApps)
+        SettingsGroupCard {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Text(
+                    text = strings.musicAppsSubtitle,
+                    color = YtmColors.TextSecondary,
+                    fontSize = 11.5.sp,
+                    lineHeight = 15.5.sp
+                )
+                val appChips = listOf(
+                    Triple("Spotify", settings.supportSpotify) { v: Boolean -> onUpdateSettings { it.copy(supportSpotify = v) } },
+                    Triple("Deezer", settings.supportDeezer) { v: Boolean -> onUpdateSettings { it.copy(supportDeezer = v) } },
+                    Triple("Apple Music", settings.supportAppleMusic) { v: Boolean -> onUpdateSettings { it.copy(supportAppleMusic = v) } },
+                    Triple("Tidal", settings.supportTidal) { v: Boolean -> onUpdateSettings { it.copy(supportTidal = v) } },
+                    Triple("SoundCloud", settings.supportSoundCloud) { v: Boolean -> onUpdateSettings { it.copy(supportSoundCloud = v) } },
+                    Triple("Amazon Music", settings.supportAmazonMusic) { v: Boolean -> onUpdateSettings { it.copy(supportAmazonMusic = v) } },
+                    Triple(strings.appLocalPlayersLabel, settings.supportLocalPlayers) { v: Boolean -> onUpdateSettings { it.copy(supportLocalPlayers = v) } }
+                )
+                appChips.chunked(2).forEach { pair ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        pair.forEach { (label, checked, onToggle) ->
+                            MusicAppToggleChip(
+                                label = label,
+                                selected = checked,
+                                onClick = { onToggle(!checked) },
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                        if (pair.size == 1) {
+                            Spacer(modifier = Modifier.weight(1f))
+                        }
+                    }
+                }
+            }
+            CardDivider()
+            SettingSwitchRow(
+                title = strings.appAllMediaTitle,
+                subtitle = strings.appAllMediaSubtitle,
+                checked = settings.supportAllMediaApps,
+                onCheckedChange = { v -> onUpdateSettings { it.copy(supportAllMediaApps = v) } }
+            )
+        }
+
         // Section 1: Offline YouTube Music Premium Downloads & Cache
         SectionHeader(strings.sectionOfflinePremium)
         SettingsGroupCard {
@@ -323,5 +377,44 @@ fun SourcesTab(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun MusicAppToggleChip(
+    label: String,
+    selected: Boolean,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(
+        modifier = modifier
+            .clip(RoundedCornerShape(11.dp))
+            .background(if (selected) YtmColors.Crimson.copy(alpha = 0.16f) else YtmColors.SurfaceElevated)
+            .border(
+                width = 1.dp,
+                color = if (selected) YtmColors.Crimson.copy(alpha = 0.55f) else YtmColors.Hairline,
+                shape = RoundedCornerShape(11.dp)
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 9.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        if (selected) {
+            Icon(
+                imageVector = Icons.Rounded.Check,
+                contentDescription = null,
+                tint = YtmColors.CrimsonSoft,
+                modifier = Modifier.size(14.dp)
+            )
+        }
+        Text(
+            text = label,
+            color = if (selected) Color.White else YtmColors.TextSecondary,
+            fontSize = 12.sp,
+            fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal,
+            maxLines = 1
+        )
     }
 }

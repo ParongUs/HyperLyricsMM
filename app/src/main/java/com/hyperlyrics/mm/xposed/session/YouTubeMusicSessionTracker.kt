@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.graphics.Bitmap
 import android.media.MediaMetadata
 import android.media.session.MediaController
 import android.media.session.MediaSession
@@ -117,7 +118,7 @@ object YouTubeMusicSessionTracker {
 
     private val sessionsChangedListener =
         MediaSessionManager.OnActiveSessionsChangedListener { controllers ->
-            selectYouTubeMusicController(controllers.orEmpty())
+            selectTargetMusicController(controllers.orEmpty())
         }
 
     fun start(app: Application) {
@@ -133,8 +134,11 @@ object YouTubeMusicSessionTracker {
                 return
             }
             manager.addOnActiveSessionsChangedListener(sessionsChangedListener, null, mainHandler)
-            selectYouTubeMusicController(manager.getActiveSessions(null).orEmpty())
-            ModuleLogger.i(TAG, "YouTube Music session tracker started")
+            selectTargetMusicController(manager.getActiveSessions(null).orEmpty())
+            RuntimeSettingsHolder.addListener {
+                runCatching { selectTargetMusicController(manager.getActiveSessions(null).orEmpty()) }
+            }
+            ModuleLogger.i(TAG, "Music session tracker started (multi-app enabled)")
         }.onFailure { error ->
             started.set(false)
             ModuleLogger.e(TAG, "Failed to start MediaSession tracking", error)
@@ -154,7 +158,7 @@ object YouTubeMusicSessionTracker {
         token: MediaSession.Token?,
         playingHint: Boolean
     ) {
-        if (!ModuleConfig.isYouTubeMusicPackage(packageName)) return
+        if (!ModuleConfig.isTargetMusicPackage(packageName, RuntimeSettingsHolder.current)) return
         val appCtx = context.applicationContext ?: context
         if (appContext == null) {
             appContext = appCtx
@@ -175,7 +179,11 @@ object YouTubeMusicSessionTracker {
         val cleanArtist = artist?.trim().orEmpty()
         if (cleanTitle.isNotEmpty()) {
             val existing = currentTrack
-            if (existing == null || !existing.title.equals(cleanTitle, ignoreCase = true)) {
+            if (existing == null ||
+                !existing.title.equals(cleanTitle, ignoreCase = true) ||
+                existing.packageName != packageName
+            ) {
+                val isYtm = ModuleConfig.isYouTubeMusicPackage(packageName)
                 val fallbackTrack = TrackInfo(
                     packageName = packageName,
                     title = cleanTitle,
@@ -183,7 +191,7 @@ object YouTubeMusicSessionTracker {
                     album = "",
                     durationMs = activeController?.metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION)
                         ?.coerceAtLeast(0L) ?: 0L,
-                    videoId = activeController?.metadata?.let(::extractVideoIdFromMetadata)
+                    videoId = if (isYtm) activeController?.metadata?.let(::extractVideoIdFromMetadata) else null
                 )
                 currentTrack = fallbackTrack
                 if (playingHint && !isPlaying) {
@@ -243,6 +251,43 @@ object YouTubeMusicSessionTracker {
         }.getOrDefault(false)
     }
 
+    fun togglePlayPause(): Boolean {
+        val controller = activeController ?: return false
+        return runCatching {
+            if (isPlaying) {
+                controller.transportControls.pause()
+            } else {
+                controller.transportControls.play()
+            }
+            true
+        }.getOrDefault(false)
+    }
+
+    fun skipToPrevious(): Boolean {
+        val controller = activeController ?: return false
+        return runCatching {
+            controller.transportControls.skipToPrevious()
+            true
+        }.getOrDefault(false)
+    }
+
+    fun skipToNext(): Boolean {
+        val controller = activeController ?: return false
+        return runCatching {
+            controller.transportControls.skipToNext()
+            true
+        }.getOrDefault(false)
+    }
+
+    fun currentArtworkBitmap(): Bitmap? {
+        val metadata = activeController?.metadata ?: return null
+        return runCatching {
+            metadata.getBitmap(MediaMetadata.METADATA_KEY_ALBUM_ART)
+                ?: metadata.getBitmap(MediaMetadata.METADATA_KEY_ART)
+                ?: metadata.getBitmap(MediaMetadata.METADATA_KEY_DISPLAY_ICON)
+        }.getOrNull()
+    }
+
     private var lyricsReceiverRegistered = false
 
     private fun registerLyricsUpdatedReceiver(ctx: Context) {
@@ -270,17 +315,18 @@ object YouTubeMusicSessionTracker {
         requestLyricsFetch(track, forceRefresh = true)
     }
 
-    private fun selectYouTubeMusicController(controllers: List<MediaController>) {
-        val ytmController = controllers.firstOrNull { controller ->
-            ModuleConfig.isYouTubeMusicPackage(controller.packageName) &&
+    private fun selectTargetMusicController(controllers: List<MediaController>) {
+        val settings = RuntimeSettingsHolder.current
+        val targetController = controllers.firstOrNull { controller ->
+            ModuleConfig.isTargetMusicPackage(controller.packageName, settings) &&
                 controller.playbackState?.state == PlaybackState.STATE_PLAYING
         } ?: controllers.firstOrNull { controller ->
-            ModuleConfig.isYouTubeMusicPackage(controller.packageName)
+            ModuleConfig.isTargetMusicPackage(controller.packageName, settings)
         }
 
-        if (ytmController?.sessionToken == activeToken) return
+        if (targetController?.sessionToken == activeToken) return
 
-        if (ytmController == null) {
+        if (targetController == null) {
             detachController()
             fetchSequence.incrementAndGet()
             currentTrack = null
@@ -293,7 +339,7 @@ object YouTubeMusicSessionTracker {
             return
         }
 
-        attachController(ytmController, ytmController.packageName)
+        attachController(targetController, targetController.packageName)
     }
 
     private fun attachController(controller: MediaController, packageName: String) {
@@ -314,7 +360,7 @@ object YouTubeMusicSessionTracker {
 
             override fun onSessionDestroyed() {
                 if (controller.sessionToken == activeToken) {
-                    selectYouTubeMusicController(emptyList())
+                    selectTargetMusicController(emptyList())
                 }
             }
         }
@@ -342,7 +388,11 @@ object YouTubeMusicSessionTracker {
 
         if (title.isEmpty()) return
 
-        val videoId = extractVideoIdFromMetadata(metadata)
+        val videoId = if (ModuleConfig.isYouTubeMusicPackage(packageName)) {
+            extractVideoIdFromMetadata(metadata)
+        } else {
+            null
+        }
         val incoming = TrackInfo(
             packageName = packageName,
             title = title,
@@ -407,7 +457,7 @@ object YouTubeMusicSessionTracker {
         fetchExecutor.execute {
             if (fetchSequence.get() != seq) return@execute
 
-            // Tier 1: Module app IPC bridge (SQLite offline cache + YTM hook videoId + Innertube)
+            // Tier 1: Module app IPC bridge (SQLite offline cache + YTM hook videoId + LRCLIB/Innertube)
             var fetched: TrackLyrics? = if (ctx != null) {
                 LyricsBridgeClient.fetchLyrics(
                     context = ctx,
@@ -416,36 +466,56 @@ object YouTubeMusicSessionTracker {
                     artist = track.artist,
                     album = track.album,
                     durationMs = track.durationMs,
-                    forceRefresh = forceRefresh
+                    forceRefresh = forceRefresh,
+                    sourcePackage = track.packageName
                 )
             } else {
                 null
             }
 
-            // Tier 2: Direct SystemUI Innertube + optional external fallback (resilient if HyperOS blocks IPC)
+            // Tier 2: Direct SystemUI fallback (resilient if HyperOS blocks IPC)
             if ((fetched == null || !fetched.hasVocalLines) && fetchSequence.get() == seq) {
                 fetched = runCatching {
-                    val byId = track.videoId?.let { vid ->
-                        directInnertubeClient.fetchLyricsByVideoId(
-                            videoId = vid,
-                            title = track.title,
-                            artist = track.artist,
-                            durationMs = track.durationMs
-                        )
-                    }
-                    var direct = if (byId != null && byId.hasVocalLines) {
-                        byId
-                    } else {
-                        directInnertubeClient.searchAndFetchLyrics(
+                    val settings = RuntimeSettingsHolder.current
+                    val isNonYtm = !ModuleConfig.isYouTubeMusicPackage(track.packageName)
+                    var direct: TrackLyrics? = null
+
+                    if (isNonYtm && settings.fallbackLrclibEnabled) {
+                        val lrc = directLrclibClient.fetchLyrics(
                             title = track.title,
                             artist = track.artist,
                             album = track.album,
-                            durationMs = track.durationMs
+                            durationMs = track.durationMs,
+                            videoId = null
                         )
+                        if (lrc != null && lrc.hasVocalLines && lrc.isSynced) {
+                            direct = lrc
+                        }
                     }
-                    val settings = RuntimeSettingsHolder.current
-                    if ((direct == null || !direct.hasVocalLines) && settings.externalFallbackEnabled) {
-                        if (settings.fallbackLrclibEnabled) {
+
+                    if (direct == null || !direct.hasVocalLines) {
+                        val byId = track.videoId?.let { vid ->
+                            directInnertubeClient.fetchLyricsByVideoId(
+                                videoId = vid,
+                                title = track.title,
+                                artist = track.artist,
+                                durationMs = track.durationMs
+                            )
+                        }
+                        direct = if (byId != null && byId.hasVocalLines) {
+                            byId
+                        } else {
+                            directInnertubeClient.searchAndFetchLyrics(
+                                title = track.title,
+                                artist = track.artist,
+                                album = track.album,
+                                durationMs = track.durationMs
+                            )
+                        }
+                    }
+
+                    if ((direct == null || !direct.hasVocalLines) && (settings.externalFallbackEnabled || isNonYtm)) {
+                        if (!isNonYtm && settings.fallbackLrclibEnabled) {
                             direct = directLrclibClient.fetchLyrics(
                                 title = track.title,
                                 artist = track.artist,
@@ -474,7 +544,7 @@ object YouTubeMusicSessionTracker {
                     }
                     direct
                 }.onFailure { err ->
-                    ModuleLogger.w(TAG, "Direct SystemUI Innertube fallback failed", err)
+                    ModuleLogger.w(TAG, "Direct SystemUI lyrics fallback failed", err)
                 }.getOrNull()
             }
 

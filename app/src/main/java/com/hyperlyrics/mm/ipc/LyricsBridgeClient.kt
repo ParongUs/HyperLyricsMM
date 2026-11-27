@@ -31,7 +31,8 @@ object LyricsBridgeClient {
         artist: String,
         album: String = "",
         durationMs: Long = 0L,
-        forceRefresh: Boolean = false
+        forceRefresh: Boolean = false,
+        sourcePackage: String? = null
     ): TrackLyrics? {
         return runCatching {
             val extras = Bundle().apply {
@@ -39,6 +40,9 @@ object LyricsBridgeClient {
                 putString(LyricsBridgeProvider.EXTRA_TITLE, title)
                 putString(LyricsBridgeProvider.EXTRA_ARTIST, artist)
                 putString(LyricsBridgeProvider.EXTRA_ALBUM, album)
+                if (!sourcePackage.isNullOrBlank()) {
+                    putString(LyricsBridgeProvider.EXTRA_SOURCE_PACKAGE, sourcePackage)
+                }
                 putLong(LyricsBridgeProvider.EXTRA_DURATION_MS, durationMs)
                 putBoolean(LyricsBridgeProvider.EXTRA_FORCE_REFRESH, forceRefresh)
             }
@@ -164,6 +168,14 @@ object LyricsBridgeClient {
                 localLrcFolderEnabled = reply.getBoolean(ModuleConfig.KEY_LOCAL_LRC_FOLDER_ENABLED, false),
                 localLrcTreeUri = reply.getString(ModuleConfig.KEY_LOCAL_LRC_TREE_URI, "").orEmpty(),
                 localSpeechExtractorEnabled = reply.getBoolean(ModuleConfig.KEY_LOCAL_SPEECH_EXTRACTOR_ENABLED, false),
+                supportSpotify = reply.getBoolean(ModuleConfig.KEY_SUPPORT_SPOTIFY, true),
+                supportDeezer = reply.getBoolean(ModuleConfig.KEY_SUPPORT_DEEZER, true),
+                supportAppleMusic = reply.getBoolean(ModuleConfig.KEY_SUPPORT_APPLE_MUSIC, true),
+                supportTidal = reply.getBoolean(ModuleConfig.KEY_SUPPORT_TIDAL, true),
+                supportSoundCloud = reply.getBoolean(ModuleConfig.KEY_SUPPORT_SOUNDCLOUD, true),
+                supportAmazonMusic = reply.getBoolean(ModuleConfig.KEY_SUPPORT_AMAZON_MUSIC, true),
+                supportLocalPlayers = reply.getBoolean(ModuleConfig.KEY_SUPPORT_LOCAL_PLAYERS, true),
+                supportAllMediaApps = reply.getBoolean(ModuleConfig.KEY_SUPPORT_ALL_MEDIA_APPS, false),
                 syncOffsetMs = reply.getInt(ModuleConfig.KEY_SYNC_OFFSET_MS, 0).coerceIn(-1500, 1500)
             )
         }.getOrNull()

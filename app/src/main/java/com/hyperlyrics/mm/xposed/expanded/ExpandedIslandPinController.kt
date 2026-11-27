@@ -3,6 +3,7 @@ package com.hyperlyrics.mm.xposed.expanded
 import android.content.Context
 import android.graphics.Rect
 import android.graphics.Region
+import android.graphics.drawable.Drawable
 import android.os.Handler
 import android.os.Looper
 import android.view.MotionEvent
@@ -13,6 +14,7 @@ import android.view.WindowManager
 import com.hyperlyrics.mm.common.ModuleLogger
 import com.hyperlyrics.mm.common.ModuleSettings
 import com.hyperlyrics.mm.xposed.RuntimeSettingsHolder
+import com.hyperlyrics.mm.xposed.session.YouTubeMusicSessionTracker
 import io.github.libxposed.api.XposedInterface.Chain
 import io.github.libxposed.api.XposedInterface.Hooker
 import io.github.libxposed.api.XposedModule
@@ -25,17 +27,13 @@ import java.util.concurrent.CopyOnWriteArrayList
 import kotlin.math.roundToInt
 
 /**
- * Enables non-blocking Pin/Float mode for Xiaomi HyperOS's Expanded Super Island:
- *  1. Updates the hosting window's WindowManager.LayoutParams (FLAG_NOT_TOUCH_MODAL |
- *     FLAG_NOT_FOCUSABLE, clearing FLAG_WATCH_OUTSIDE_TOUCH & FLAG_DIM_BEHIND) so touches
- *     and keyboard focus pass directly to underlying apps without dimming the screen.
- *  2. Registers a ViewTreeObserver.OnComputeInternalInsetsListener (TOUCHABLE_INSETS_REGION)
- *     restricting hit-testing strictly to the expanded island card rectangle.
- *  3. Guards root dispatchTouchEvent and HyperOS outside-touch/auto-collapse callbacks so
- *     the expanded card stays open and lyrics keep flowing until the user explicitly unpins it.
- *
- * Cleanly restores original WindowManager flags and insets whenever unpinned, disabled,
- * detached, or when a non-YouTube Music app binds to the island.
+ * Coordinates non-blocking Pin/Float mode for Xiaomi HyperOS's Expanded Super Island:
+ *  - Launches a dedicated SystemUI floating card window ([PinnedFloatingIslandOverlay])
+ *    strictly bounded to the card rectangle with `FLAG_NOT_FOCUSABLE | FLAG_NOT_TOUCH_MODAL`
+ *    so outside touches, app scrolling, and keyboard input ALWAYS pass through and HyperOS's
+ *    global gesture monitor can never minimize the pinned lyrics card.
+ *  - Also applies WindowManager flag & touchable-insets guards on the native expanded window
+ *    when active, restoring everything cleanly when unpinned or when switching away.
  */
 object ExpandedIslandPinController {
     private const val TAG = "ExpandedIslandPin"
@@ -62,10 +60,22 @@ object ExpandedIslandPinController {
     private var manualPinOverride: Boolean? = null
 
     @Volatile
-    private var activeYtmSession: Boolean = false
+    private var activeMediaSession: Boolean = false
 
     @Volatile
     private var activePlayerRef: WeakReference<ViewGroup>? = null
+
+    @Volatile
+    private var lastSystemContext: Context? = null
+
+    @Volatile
+    private var lastCardScreenRect: Rect? = null
+
+    @Volatile
+    private var lastPalette: YtmCardPalette = YtmCardPalette.DEFAULT_DYNAMIC
+
+    @Volatile
+    private var lastArtworkDrawable: Drawable? = null
 
     @Volatile
     private var pinnedRootRef: WeakReference<View>? = null
@@ -89,6 +99,7 @@ object ExpandedIslandPinController {
     }
 
     fun isPinned(settings: ModuleSettings = RuntimeSettingsHolder.current): Boolean {
+        if (PinnedFloatingIslandOverlay.isShowing) return true
         return ExpandedPinPolicy.isEffectivelyPinned(
             masterEnabled = settings.masterEnabled,
             expandedLyricsEnabled = settings.expandedLyricsEnabled,
@@ -98,7 +109,8 @@ object ExpandedIslandPinController {
     }
 
     fun isEffectivelyPinnedNow(): Boolean {
-        if (!activeYtmSession) return false
+        if (PinnedFloatingIslandOverlay.isShowing) return true
+        if (!activeMediaSession) return false
         val player = activePlayerRef?.get() ?: return false
         if (!player.isAttachedToWindow || !player.isShown) return false
         return isPinned(RuntimeSettingsHolder.current)
@@ -110,23 +122,63 @@ object ExpandedIslandPinController {
         ModuleLogger.i(TAG, "Expanded island pin toggled -> pinned=$next")
 
         val player = activePlayerRef?.get()
-        if (player != null) {
-            applyOrRestoreWindowPin(player, activeYtmSession && next)
-        } else if (!next) {
-            restorePinnedWindow()
+        if (next) {
+            if (player != null) {
+                capturePlayerScreenRect(player)?.let { lastCardScreenRect = it }
+                applyOrRestoreWindowPin(player, pin = true)
+            }
+            val ctx = player?.context ?: lastSystemContext
+            if (ctx != null && activeMediaSession) {
+                PinnedFloatingIslandOverlay.show(
+                    context = ctx,
+                    anchorRect = lastCardScreenRect,
+                    palette = lastPalette,
+                    artworkDrawable = lastArtworkDrawable,
+                    artworkBitmap = YouTubeMusicSessionTracker.currentArtworkBitmap(),
+                    settings = settings,
+                    onUnpin = { unpinAndDismiss() }
+                )
+            }
+        } else {
+            unpinAndDismiss()
+            return false
         }
 
-        mainHandler.post {
-            pinStateListeners.forEach { listener -> runCatching { listener(next) } }
+        notifyPinStateChanged(true)
+        return true
+    }
+
+    fun unpinAndDismiss() {
+        manualPinOverride = false
+        PinnedFloatingIslandOverlay.dismiss()
+        restorePinnedWindow()
+        notifyPinStateChanged(false)
+    }
+
+    fun updateVisuals(
+        palette: YtmCardPalette,
+        artworkDrawable: Drawable?,
+        settings: ModuleSettings = RuntimeSettingsHolder.current
+    ) {
+        lastPalette = palette
+        if (artworkDrawable != null) lastArtworkDrawable = artworkDrawable
+        if (PinnedFloatingIslandOverlay.isShowing) {
+            PinnedFloatingIslandOverlay.updateVisuals(
+                palette = palette,
+                artworkDrawable = artworkDrawable,
+                artworkBitmap = YouTubeMusicSessionTracker.currentArtworkBitmap(),
+                settings = settings
+            )
         }
-        return next
     }
 
     fun clearSession() {
-        activeYtmSession = false
+        activeMediaSession = false
         manualPinOverride = null
         activePlayerRef = null
+        PinnedFloatingIslandOverlay.dismiss()
         restorePinnedWindow()
+        notifyPinStateChanged(false)
     }
 
     fun hookSystemUiWindowManager(module: XposedModule) {
@@ -193,20 +245,26 @@ object ExpandedIslandPinController {
 
     fun reconcilePlayer(
         player: ViewGroup,
-        isYtmActive: Boolean,
-        settings: ModuleSettings
+        isMediaActive: Boolean,
+        settings: ModuleSettings,
+        palette: YtmCardPalette = lastPalette,
+        artworkDrawable: Drawable? = lastArtworkDrawable
     ) {
-        activeYtmSession = isYtmActive
-        if (!isYtmActive) {
+        lastSystemContext = player.context.applicationContext ?: player.context
+        lastPalette = palette
+        if (artworkDrawable != null) lastArtworkDrawable = artworkDrawable
+
+        activeMediaSession = isMediaActive
+        if (!isMediaActive) {
             if (activePlayerRef?.get() === player) {
                 activePlayerRef = null
             }
             manualPinOverride = null
+            PinnedFloatingIslandOverlay.dismiss()
             restorePinnedWindow()
             return
         }
 
-        // Prefer a real attached player over HyperOS's transition dummyHolder
         val currentTracked = activePlayerRef?.get()
         if (currentTracked == null || !currentTracked.isAttachedToWindow || player.isAttachedToWindow) {
             activePlayerRef = WeakReference(player)
@@ -214,11 +272,36 @@ object ExpandedIslandPinController {
 
         ensureAttachLifecycleMonitor(player)
 
-        val shouldPin = isPinned(settings)
         if (player.isAttachedToWindow && player.windowToken != null) {
-            applyOrRestoreWindowPin(player, shouldPin)
+            capturePlayerScreenRect(player)?.let { lastCardScreenRect = it }
+        }
+
+        val shouldPin = isPinned(settings)
+        if (shouldPin && player.isAttachedToWindow && player.windowToken != null && player.isShown) {
+            applyOrRestoreWindowPin(player, pin = true)
+            if (settings.pinExpandedIslandEnabled && manualPinOverride != false && !PinnedFloatingIslandOverlay.isShowing) {
+                PinnedFloatingIslandOverlay.show(
+                    context = player.context,
+                    anchorRect = lastCardScreenRect,
+                    palette = lastPalette,
+                    artworkDrawable = lastArtworkDrawable,
+                    artworkBitmap = YouTubeMusicSessionTracker.currentArtworkBitmap(),
+                    settings = settings,
+                    onUnpin = { unpinAndDismiss() }
+                )
+            }
         } else if (!shouldPin) {
+            PinnedFloatingIslandOverlay.dismiss()
             restorePinnedWindow()
+        }
+
+        if (PinnedFloatingIslandOverlay.isShowing) {
+            PinnedFloatingIslandOverlay.updateVisuals(
+                palette = lastPalette,
+                artworkDrawable = lastArtworkDrawable,
+                artworkBitmap = YouTubeMusicSessionTracker.currentArtworkBitmap(),
+                settings = settings
+            )
         }
     }
 
@@ -229,17 +312,41 @@ object ExpandedIslandPinController {
             override fun onViewAttachedToWindow(v: View) {
                 val p = v as? ViewGroup ?: return
                 activePlayerRef = WeakReference(p)
-                if (activeYtmSession && isPinned(RuntimeSettingsHolder.current)) {
-                    mainHandler.post {
-                        if (p.isAttachedToWindow && activeYtmSession && isPinned(RuntimeSettingsHolder.current)) {
+                // Fresh expand cycle: if floating overlay isn't currently showing, allow Auto-Pin again
+                if (!PinnedFloatingIslandOverlay.isShowing && manualPinOverride == false) {
+                    manualPinOverride = null
+                }
+                val settings = RuntimeSettingsHolder.current
+                if (activeMediaSession && isPinned(settings)) {
+                    mainHandler.postDelayed({
+                        if (p.isAttachedToWindow && activeMediaSession && isPinned(RuntimeSettingsHolder.current)) {
+                            capturePlayerScreenRect(p)?.let { lastCardScreenRect = it }
                             applyOrRestoreWindowPin(p, pin = true)
+                            if (RuntimeSettingsHolder.current.pinExpandedIslandEnabled &&
+                                manualPinOverride != false &&
+                                !PinnedFloatingIslandOverlay.isShowing
+                            ) {
+                                PinnedFloatingIslandOverlay.show(
+                                    context = p.context,
+                                    anchorRect = lastCardScreenRect,
+                                    palette = lastPalette,
+                                    artworkDrawable = lastArtworkDrawable,
+                                    artworkBitmap = YouTubeMusicSessionTracker.currentArtworkBitmap(),
+                                    settings = RuntimeSettingsHolder.current,
+                                    onUnpin = { unpinAndDismiss() }
+                                )
+                            }
                         }
-                    }
+                    }, 90L)
                 }
             }
 
             override fun onViewDetachedFromWindow(v: View) {
-                // Reset manual override once the expanded island is actually detached/closed
+                // Keep PinnedFloatingIslandOverlay alive when HyperOS folds its native card behind it!
+                if (PinnedFloatingIslandOverlay.isShowing) {
+                    restorePinnedWindow()
+                    return
+                }
                 if (activePlayerRef?.get() === v) {
                     manualPinOverride = null
                     restorePinnedWindow()
@@ -248,12 +355,18 @@ object ExpandedIslandPinController {
         })
 
         player.addOnLayoutChangeListener { v, l, t, r, b, ol, ot, or_, ob ->
-            if ((l != ol || t != ot || r != or_ || b != ob) &&
-                v === activePlayerRef?.get() &&
-                isEffectivelyPinnedNow()
-            ) {
-                pinnedRootRef?.get()?.requestLayout()
+            if ((l != ol || t != ot || r != or_ || b != ob) && v === activePlayerRef?.get()) {
+                capturePlayerScreenRect(v)?.let { lastCardScreenRect = it }
+                if (isEffectivelyPinnedNow()) {
+                    pinnedRootRef?.get()?.requestLayout()
+                }
             }
+        }
+    }
+
+    private fun notifyPinStateChanged(pinned: Boolean) {
+        mainHandler.post {
+            pinStateListeners.forEach { listener -> runCatching { listener(pinned) } }
         }
     }
 
@@ -265,7 +378,6 @@ object ExpandedIslandPinController {
         }
         if (!player.isAttachedToWindow || player.windowToken == null) return
 
-        // If switching root windows, cleanly restore the previous one first
         val prevRoot = pinnedRootRef?.get()
         if (prevRoot != null && prevRoot !== rootView) {
             restoreWindow(prevRoot)
@@ -365,7 +477,6 @@ object ExpandedIslandPinController {
                     return chain.proceed()
                 }
             })
-            ModuleLogger.d(TAG, "Hooked ${cls.simpleName}.dispatchTouchEvent for pin touch guard")
         }.onFailure {
             hookedRootClasses.remove(cls)
         }
@@ -397,9 +508,6 @@ object ExpandedIslandPinController {
             api.addListenerMethod.invoke(vto, proxy)
             insetsListenerProxy = proxy
             insetsAttachedRootRef = WeakReference(rootView)
-            ModuleLogger.d(TAG, "Attached OnComputeInternalInsetsListener to ${rootView.javaClass.simpleName}")
-        }.onFailure {
-            ModuleLogger.d(TAG, "OnComputeInternalInsetsListener unavailable: ${it.message}")
         }
     }
 
@@ -414,11 +522,13 @@ object ExpandedIslandPinController {
         }
     }
 
-    /**
-     * Resolves the exact window-relative bounding rectangle of the expanded media card.
-     * Expands slightly to include any immediate rounded card wrapper (up to 20dp padding)
-     * without ever expanding to a full-screen scrim container.
-     */
+    private fun capturePlayerScreenRect(player: View): Rect? {
+        if (!player.isAttachedToWindow || player.width <= 0 || player.height <= 0) return null
+        val loc = IntArray(2)
+        player.getLocationOnScreen(loc)
+        return Rect(loc[0], loc[1], loc[0] + player.width, loc[1] + player.height)
+    }
+
     private fun computeCardWindowRect(): Rect? {
         val player = activePlayerRef?.get() ?: return null
         if (!player.isAttachedToWindow || !player.isShown || player.width <= 0 || player.height <= 0) {
@@ -473,8 +583,6 @@ object ExpandedIslandPinController {
                 setTouchableInsetsMethod = setTouchableInsetsMethod,
                 touchableRegionField = touchableRegionField
             ).also { cachedInsetsApi = it }
-        }.onFailure {
-            ModuleLogger.d(TAG, "InternalInsetsInfo reflection unavailable: ${it.message}")
         }.getOrNull()
     }
 
